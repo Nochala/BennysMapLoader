@@ -1,18 +1,3 @@
-﻿
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #include <windows.h>
 #include <psapi.h>
 #include <cstdint>
@@ -38,9 +23,6 @@ static const char* kBuildTag = "v100a-frozen-production-notification-fix";
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
 
-
-
-
 static bool g_startupDebugCapture = true;
 static bool g_productionLogFinalized = false;
 static bool g_productionLogSuccess = false;
@@ -51,31 +33,10 @@ static bool g_deepMemoryDiagnostics = false;
 static bool g_showNotification = false;
 static bool g_experimentalMemoryPatch = false;
 
-
-
-
-
-
 static bool g_experimentalInternalGroupAdd = false;
 static bool g_experimentalInternalGroupAddApplied = false;
 
-
-
-
-
-
 static bool g_experimentalMapStateReprocess = false;
-
-
-
-
-
-
-
-
-
-
-
 
 static bool g_experimentalOverlayDescriptorRewrite = false;
 static bool g_overlayDescriptorRewriteApplied = false;
@@ -84,11 +45,6 @@ static uintptr_t g_overlayDescriptorRewriteRecord = 0;
 static uintptr_t g_overlayDescriptorRewriteGroupAddress = 0;
 static uint32_t g_overlayDescriptorRewriteOriginalGroup = 0;
 static uint32_t g_overlayDescriptorRewriteObservedHits = 0;
-
-
-
-
-
 
 using RockstarGroupPairMutator1012 =
     void(*)(void* child, uint32_t* first, uint32_t* second, bool addPair);
@@ -113,11 +69,6 @@ static volatile LONG g_constructionHookStoryMapGroupCalls = 0;
 static volatile LONG g_constructionHookBennyCalls = 0;
 static DWORD g_constructionHookFailureCode = 0;
 
-
-
-
-
-
 static bool g_constructionHookAllowRewrite = false;
 static volatile LONG g_v38ConstructionInsertState = 0; 
 static volatile LONG g_v38LowriderPostCalls = 0;
@@ -133,9 +84,6 @@ static uint32_t g_v38InsertEntry2Group = 0;
 static uint32_t g_v38InsertEntry2Key = 0;
 
 
-
-
-
 static void* g_preFilterTrampoline = nullptr;
 static void* g_preFilterStub = nullptr;
 static bool g_preFilterHookAttempted = false;
@@ -148,11 +96,6 @@ static DWORD g_preFilterFailureCode = 0;
 static volatile LONG g_preFilterTotalCalls = 0;
 static volatile LONG g_preFilterBennyMatches = 0;
 static volatile LONG g_preFilterRewrites = 0;
-
-
-
-
-
 static volatile LONG g_preFilterRdxGroupMap = 0;
 static volatile LONG g_preFilterRdxGroupMapSp = 0;
 static volatile LONG g_preFilterRdxBenny = 0;
@@ -166,11 +109,6 @@ static uint32_t g_preFilterR8WhenRdxBenny = 0;
 static uintptr_t g_preFilterLastContext = 0;
 static uintptr_t g_preFilterLastGroupPtr = 0;
 static uintptr_t g_preFilterLastAssociatedPtr = 0;
-
-
-
-
-
 static void* g_midFilterStub = nullptr;
 static bool g_midFilterHookAttempted = false;
 static bool g_midFilterHookInstalled = false;
@@ -189,16 +127,6 @@ static uint32_t g_midFilterLastAssociatedWhenMap = 0;
 static uint32_t g_midFilterLastAssociatedWhenStory = 0;
 static uint32_t g_midFilterLastGroupWhenBenny = 0;
 static volatile LONG g_midFilterRewrites = 0;
-
-
-
-
-
-
-
-
-
-
 using RockstarGroupPairProcessor1012 =
     uintptr_t(*)(void* child, uint32_t* group, uint32_t* associated);
 
@@ -223,11 +151,6 @@ static uint32_t g_v46TriggerAssociated = 0;
 static uintptr_t g_v46SyntheticReturnValue = 0;
 static bool g_v46FinalPairVerified = false;
 
-
-
-
-
-
 static volatile LONG g_v47SyntheticActive = 0;
 static volatile LONG g_v47MembershipBypassHits = 0;
 static bool g_v47MembershipHookAttempted = false;
@@ -235,12 +158,6 @@ static bool g_v47MembershipHookInstalled = false;
 static bool g_v47MembershipSiteVerified = false;
 static DWORD g_v47MembershipFailureCode = 0;
 static void* g_v47MembershipStub = nullptr;
-
-
-
-
-
-
 
 using RockstarMapGroupProcessor1012 =
     bool(*)(void* context);
@@ -265,16 +182,6 @@ static bool g_v48LastReturnedResult = false;
 
 
 
-
-
-
-
-
-
-
-
-
-
 static bool g_v49OverlayHookAttempted = false;
 static bool g_v49OverlayHookInstalled = false;
 static bool g_v49OverlaySiteVerified = false;
@@ -287,11 +194,6 @@ static volatile LONG g_v49OverlayBennyHits = 0;
 static volatile LONG g_v49OverlayRewrites = 0;
 static uint32_t g_v49OverlayLastOriginalGroup = 0;
 static uint32_t g_v49OverlayLastKey = 0;
-
-
-
-
-
 
 static volatile LONG g_v82OverlaySearchAttempts = 0;
 static volatile LONG g_v82OverlayUniqueHits = 0;
@@ -338,19 +240,6 @@ static volatile LONG g_v50LowriderObservationCount = 0;
 static uintptr_t g_v50TriggerCallerReturn = 0;
 static uintptr_t g_v50TriggerCallsite = 0;
 static LONG g_v50TriggerGlobalCallNumber = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 using RockstarC272A0PairSource1012 =
     uintptr_t(*)(
