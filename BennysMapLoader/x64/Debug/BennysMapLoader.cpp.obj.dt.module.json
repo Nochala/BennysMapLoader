@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "BennysMapLoader\\x64\\Debug\\BennysMapLoader.obj",
+            "outputs": [
+                "BennysMapLoader\\x64\\Debug\\BennysMapLoader.cpp.obj.dt.module.json",
+                "BennysMapLoader\\x64\\Debug\\BennysMapLoader.cpp.obj.dt.d.json"
+            ],
+            "requires": []
+        }
+    ]
+}

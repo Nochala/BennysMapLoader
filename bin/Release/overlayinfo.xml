@@ -1,0 +1,28 @@
+<sOverlayInfos>
+	<overlayInfos>
+		<Item>
+			<nameId>gta5_citye_scentral_01</nameId>
+			<changeSet>MPLOWRIDER_GTA5_CITYE_SCENTRAL_01</changeSet>
+			<version value="4"/>
+			<changeSetGroupToExecuteWith>GROUP_MAP_SP</changeSetGroupToExecuteWith>
+		</Item>
+		<Item>
+			<nameId>gta5_hills_country_04</nameId>
+			<changeSet>MPLOWRIDER_GTA5_HILLS_COUNTRY_04</changeSet>
+			<version value="4"/>
+			<changeSetGroupToExecuteWith>GROUP_MAP</changeSetGroupToExecuteWith>
+		</Item>		
+		<Item>
+			<nameId>gta5_hills_country_06</nameId>
+			<changeSet>MPLOWRIDER_GTA5_HILLS_COUNTRY_06</changeSet>
+			<version value="4"/>
+			<changeSetGroupToExecuteWith>GROUP_MAP</changeSetGroupToExecuteWith>
+		</Item>		
+		<Item>
+			<nameId>gta5_citye_indust_01</nameId>
+			<changeSet>MPLOWRIDER_GTA5_CITYE_INDUST_01</changeSet>
+			<version value="4"/>
+			<changeSetGroupToExecuteWith>GROUP_MAP</changeSetGroupToExecuteWith>
+		</Item>					
+	</overlayInfos>
+</sOverlayInfos>
