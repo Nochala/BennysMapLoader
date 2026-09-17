@@ -17,8 +17,7 @@
 static const char* g_iniPath = ".\\BennysMapLoader.ini";
 static const char* g_logPath = "BennysMapLoader.log";
 
-
-static const char* kBuildTag = "v100a-frozen-production-notification-fix";
+static const char* kBuildTag = "v100b-tightened-benny-only-patching";
 
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
@@ -83,7 +82,6 @@ static uint16_t g_v38InsertCapacityAfter = 0;
 static uint32_t g_v38InsertEntry2Group = 0;
 static uint32_t g_v38InsertEntry2Key = 0;
 
-
 static void* g_preFilterTrampoline = nullptr;
 static void* g_preFilterStub = nullptr;
 static bool g_preFilterHookAttempted = false;
@@ -96,6 +94,7 @@ static DWORD g_preFilterFailureCode = 0;
 static volatile LONG g_preFilterTotalCalls = 0;
 static volatile LONG g_preFilterBennyMatches = 0;
 static volatile LONG g_preFilterRewrites = 0;
+
 static volatile LONG g_preFilterRdxGroupMap = 0;
 static volatile LONG g_preFilterRdxGroupMapSp = 0;
 static volatile LONG g_preFilterRdxBenny = 0;
@@ -109,6 +108,7 @@ static uint32_t g_preFilterR8WhenRdxBenny = 0;
 static uintptr_t g_preFilterLastContext = 0;
 static uintptr_t g_preFilterLastGroupPtr = 0;
 static uintptr_t g_preFilterLastAssociatedPtr = 0;
+
 static void* g_midFilterStub = nullptr;
 static bool g_midFilterHookAttempted = false;
 static bool g_midFilterHookInstalled = false;
@@ -127,6 +127,7 @@ static uint32_t g_midFilterLastAssociatedWhenMap = 0;
 static uint32_t g_midFilterLastAssociatedWhenStory = 0;
 static uint32_t g_midFilterLastGroupWhenBenny = 0;
 static volatile LONG g_midFilterRewrites = 0;
+
 using RockstarGroupPairProcessor1012 =
     uintptr_t(*)(void* child, uint32_t* group, uint32_t* associated);
 
@@ -180,8 +181,6 @@ static volatile LONG g_v48ForcedTrueHits = 0;
 static bool g_v48LastOriginalResult = false;
 static bool g_v48LastReturnedResult = false;
 
-
-
 static bool g_v49OverlayHookAttempted = false;
 static bool g_v49OverlayHookInstalled = false;
 static bool g_v49OverlaySiteVerified = false;
@@ -221,7 +220,6 @@ static uint32_t g_v84OverlayWorkerGroupAfter = 0;
 static uint32_t g_v84OverlayWorkerAssociatedBefore = 0;
 static uint32_t g_v84OverlayWorkerAssociatedAfter = 0;
 static constexpr bool g_v85EnhancedOverlayExperiment = false;
-
 
 struct V50LowriderCallerObservation
 {
@@ -287,17 +285,6 @@ static uintptr_t g_v51TriggerCallerReturn = 0;
 static uintptr_t g_v51TriggerCallsite = 0;
 static LONG g_v51TriggerGlobalCallNumber = 0;
 
-
-
-
-
-
-
-
-
-
-
-
 using RockstarC26F00GroupLoop1012 =
     uintptr_t(*)(
         void* context,
@@ -339,12 +326,6 @@ static V52C26F00CallerObservation
 static uintptr_t g_v52TriggerCallerReturn = 0;
 static uintptr_t g_v52TriggerCallsite = 0;
 static LONG g_v52TriggerGlobalCallNumber = 0;
-
-
-
-
-
-
 
 struct EnhancedV93StructuralSemanticState
 {
@@ -393,9 +374,6 @@ struct EnhancedV93StructuralSemanticState
 
 static EnhancedV93StructuralSemanticState g_enhancedV93{};
 
-
-
-
 static volatile LONG g_v54DescriptorCandidateHits = 0;
 static volatile LONG g_v54DescriptorAlreadyPresentHits = 0;
 static volatile LONG g_v54DescriptorInjectedHits = 0;
@@ -413,12 +391,6 @@ static volatile LONG g_v55DescriptorWriteFaultHits = 0;
 static volatile LONG g_v55DescriptorRestoreFailureHits = 0;
 static volatile LONG g_v55SourceStoryBennyProducedHits = 0;
 static volatile LONG g_v55DownstreamMapBennyProducedHits = 0;
-
-
-
-
-
-
 
 struct V78C25F4ECallsiteSnapshot
 {
@@ -465,14 +437,6 @@ static uintptr_t g_v78C25F4ECallsite = 0;
 static uintptr_t g_v78C25F4EBridge = 0;
 static uint8_t g_v78C25F4EOriginalCallBytes[5]{};
 
-
-
-
-
-
-
-
-
 static constexpr bool g_v79EnhancedLateReplayExperiment = false;
 static volatile LONG g_v79NaturalInjectionSuppressedHits = 0;
 static volatile LONG g_v79LateReplayState = 0; 
@@ -505,22 +469,12 @@ static uint32_t g_v79SyntheticAssociated[1] =
 static void LogV79LateReplayState(const char* phase);
 static bool RunV79EnhancedLateC26F00Replay();
 
-
-
-
-
 alignas(16) static uint8_t g_v55DescriptorScratch[
     (static_cast<size_t>(64) + 1) * 0x18]{};
 static uint32_t g_v55SyntheticAssociated[1] =
 {
     0x4CDFC843U
 };
-
-
-
-
-
-
 
 struct EnhancedV100RuntimeResolverState
 {
@@ -592,7 +546,6 @@ static bool ResolveEnhancedV100LiveMutationLayout(
     uintptr_t callsite);
 static void LogEnhancedV100IntegrationState(const char* phase);
 
-
 static bool ScanExactBennyDescriptorNearSetup2Context(
     uintptr_t context,
     uintptr_t& record,
@@ -650,10 +603,6 @@ static bool TryApplyV82OverlayDescriptorForNaturalCall(uintptr_t contextAddress)
     uint64_t bytesScanned = 0;
     uint32_t regionsScanned = 0;
 
-    
-    
-    
-    
     const bool unique =
         ScanExactBennyDescriptorNearSetup2Context(
             contextAddress,
@@ -786,7 +735,6 @@ static bool RestoreV82OverlayDescriptorAfterNaturalCall()
     if (!g_v82OverlayGroupAddress)
         return false;
 
-    
     if (g_v82OverlayOriginalGroup == 0x578F99E2U)
         return true;
 
@@ -869,13 +817,6 @@ static bool RestoreV82OverlayDescriptorAfterNaturalCall()
     return restored;
 }
 
-
-
-
-
-
-
-
 using MapGroupExtractor1012 = void(*)(void* child, void* output);
 
 static MapGroupExtractor1012 g_groupExtractorOriginal = nullptr;
@@ -909,15 +850,6 @@ static LONG g_groupExtractorLastBennyEntryIndex = -1;
 static uint16_t g_groupExtractorLastBennyCountBefore = 0;
 static uint16_t g_groupExtractorLastBennyCountAfter = 0;
 
-
-
-
-
-
-
-
-
-
 static void* g_preDiscardPairStub = nullptr;
 static bool g_preDiscardPairHookAttempted = false;
 static bool g_preDiscardPairHookInstalled = false;
@@ -937,22 +869,6 @@ static uint32_t g_preDiscardPairLastAssociatedWhenMap = 0;
 static uint32_t g_preDiscardPairLastAssociatedWhenStory = 0;
 static uint32_t g_preDiscardPairLastGroupWhenBenny = 0;
 static uintptr_t g_preDiscardPairLastGroupPointerWhenBenny = 0;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 using Setup2LoaderA1012 = bool(*)(void* context, uint32_t callerArg2);
 
@@ -1045,7 +961,6 @@ static bool IsEnhancedExecutableImage()
         "GTA5_Enhanced.exe") == 0;
 }
 
-
 static bool IsLegacyExecutableImage()
 {
     char path[MAX_PATH]{};
@@ -1068,12 +983,6 @@ static bool IsLegacyExecutableImage()
         fileName,
         "GTA5.exe") == 0;
 }
-
-
-
-
-
-
 
 struct EarlyConstructionSnapshot
 {
@@ -1201,16 +1110,8 @@ struct EarlyConstructionSnapshot
 
 static EarlyConstructionSnapshot g_earlyConstructionSnapshot;
 
-
-
-
-
-
-
 static const uint64_t kExecuteContentChangesetNative = 0x6DBFCEE18F70FF9BULL;
 static const uint64_t kRevertContentChangesetNative = 0x67F40FC4E8C80E77ULL;
-
-
 
 static const uint64_t kExecuteContentChangesetGroupForAllNative = 0x6BEDF5769AC2DC07ULL;
 static const uint64_t kRevertContentChangesetGroupForAllNative = 0x3C1978285B036B25ULL;
@@ -1248,7 +1149,6 @@ static void ResetLogFile()
         fclose(f);
 }
 
-
 static void WriteLogTextDirect(
     const char* text,
     size_t length)
@@ -1269,7 +1169,6 @@ static void WriteLogTextDirect(
     fclose(f);
 }
 
-
 static void CaptureOrWriteLogLine(
     const char* text)
 {
@@ -1285,8 +1184,6 @@ static void CaptureOrWriteLogLine(
     AcquireSRWLockExclusive(
         &g_productionLogLock);
 
-    
-    
     if (g_productionLogFinalized
         && g_productionLogSuccess)
     {
@@ -1375,7 +1272,6 @@ static void Logf(const char* fmt, ...)
     CaptureOrWriteLogLine(
         buffer.data());
 }
-
 
 static void FinalizeProductionSuccessLog(
     bool enhanced)
@@ -1554,7 +1450,6 @@ static void LogEarlyConstructionSnapshot()
     }
 }
 
-
 static uint32_t Joaat(const char* text)
 {
     uint32_t hash = 0;
@@ -1580,7 +1475,7 @@ static uint32_t Joaat(const char* text)
 
 static bool IsEnhancedVersion()
 {
-    
+
     return (getGameVersion() >= 1000);
 }
 
@@ -1613,10 +1508,6 @@ static bool GetExeRange(uint8_t*& base, uint8_t*& end)
     return true;
 }
 
-
-
-
-
 static bool FindRuntimeFunctionBounds(
     uint8_t* base,
     uint8_t* end,
@@ -1629,13 +1520,11 @@ static bool ReadProcessExact(
     void* destination,
     SIZE_T size);
 
-
 static void WriteAbsoluteJump12(uint8_t* destination, const void* target)
 {
     if (!destination || !target)
         return;
 
-    
     destination[0] = 0x48;
     destination[1] = 0xB8;
 
@@ -1646,11 +1535,9 @@ static void WriteAbsoluteJump12(uint8_t* destination, const void* target)
         &absolute,
         sizeof(absolute));
 
-    
     destination[10] = 0xFF;
     destination[11] = 0xE0;
 }
-
 
 static bool IsReadableCommittedPrivateRegion(
     const MEMORY_BASIC_INFORMATION& mbi)
@@ -1704,15 +1591,6 @@ static bool ScanExactBennyDescriptorNearSetup2Context(
     const uint8_t firstByte =
         static_cast<uint8_t>(dlcHash & 0xFFU);
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
     const uintptr_t backwardRadius =
         static_cast<uintptr_t>(16ULL * 1024ULL * 1024ULL);
     const uintptr_t forwardRadius =
@@ -1876,7 +1754,6 @@ static bool ScanExactBennyDescriptorNearSetup2Context(
         return false;
     }
 
-    
     return exactHitCount == 1
         && record != 0;
 }
@@ -1928,8 +1805,6 @@ static bool TryCaptureBennyDescriptorAtSetup2Timing(
     g_setup2LoaderTimingExactHits =
         exactHits;
 
-    
-    
     g_setup2LoaderScanWindowStart =
         windowStart;
     g_setup2LoaderScanWindowEnd =
@@ -1981,8 +1856,6 @@ static bool TryCaptureBennyDescriptorAtSetup2Timing(
     const uint32_t groupMap = 0xBCC89179U;
     const uint32_t groupMapSp = 0x578F99E2U;
 
-    
-    
     const bool rewriteEnabled = false;
 
     if (!rewriteEnabled)
@@ -2147,9 +2020,6 @@ static bool Setup2LoaderADetour(void* context, uint32_t callerArg2)
         reinterpret_cast<uintptr_t>(context);
     g_setup2LoaderLastContext = contextAddress;
 
-    
-    
-    
     bool newSequence = false;
     uintptr_t sequenceDelta = 0;
     if (!g_setup2LoaderSequenceBase
@@ -2215,11 +2085,6 @@ static bool Setup2LoaderADetour(void* context, uint32_t callerArg2)
     if (!original)
         return false;
 
-    
-    
-    
-    
-
     const bool result =
         original(context, callerArg2);
 
@@ -2237,8 +2102,6 @@ static bool Setup2LoaderADetour(void* context, uint32_t callerArg2)
         table108After,
         count110After,
         capacity112After);
-
-    
 
     HMODULE exe = GetModuleHandleA(nullptr);
     if (exe)
@@ -2288,9 +2151,7 @@ static bool Setup2LoaderADetour(void* context, uint32_t callerArg2)
 
     if (sequenceIndex == 64)
     {
-        
-        
-        
+
         InterlockedIncrement(
             &g_setup2LoaderChild64CandidateCalls);
     }
@@ -2374,7 +2235,6 @@ static void InstallSetup2LoaderProbeAtModuleLoad()
             return;
         }
 
-        
         static const uint8_t expectedPrefix[17] =
         {
             0x56,
@@ -2547,8 +2407,8 @@ struct Setup2LoaderProbeInstaller
     }
 };
 
-static Setup2LoaderProbeInstaller
-    g_setup2LoaderProbeInstaller;
+static Setup2LoaderProbeInstaller*
+    g_setup2LoaderProbeInstallerDisabled = nullptr;
 
 static void LogSetup2LoaderChild64Resolution(
     const char* phase)
@@ -3008,9 +2868,6 @@ static void ConstructionC2F090Detour(
 
         g_constructionHookRewroteBenny = true;
 
-        
-        
-        
         original(
             child,
             &storyGroup,
@@ -3025,11 +2882,6 @@ static void ConstructionC2F090Detour(
         second,
         addPair);
 
-    
-    
-    
-    
-    
 }
 
 static void InstallConstructionC2F090HookAtModuleLoad()
@@ -3152,7 +3004,6 @@ static void InstallConstructionC2F090HookAtModuleLoad()
         g_constructionHookMapStateWasNull =
             (mapState == 0);
 
-        
         if (mapState != 0)
         {
             g_constructionHookFailureCode = 8;
@@ -3270,15 +3121,8 @@ struct ConstructionC2F090HookInstaller
     }
 };
 
-
-
-
-
-
-
-
-static ConstructionC2F090HookInstaller
-    g_constructionC2F090HookInstaller;
+static ConstructionC2F090HookInstaller*
+    g_constructionC2F090HookInstallerDisabled = nullptr;
 
 static const char* GetConstructionHookFailureReason()
 {
@@ -3558,11 +3402,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
             return;
         }
 
-        
-        
-        
-        
-        
         static const uint8_t expectedSite[16] =
         {
             0x41, 0x8B, 0x04, 0x24,
@@ -3583,8 +3422,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         }
         g_midFilterSiteVerified = true;
 
-        
-        
         static const uint8_t expectedTailArgs[29] =
         {
             0x41, 0x8B, 0x07,
@@ -3652,7 +3489,7 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         auto emitR12CompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x41;
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0x3C;
@@ -3671,7 +3508,7 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         auto emitR15CompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x41;
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0x3F;
@@ -3705,7 +3542,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
             dlc,
             &g_midFilterDlcAssociatedHits);
 
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3C;
@@ -3733,7 +3569,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x5A; 
         PatchRel32(stubBytes, jneMapCapture, 6, p);
 
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3C;
@@ -3761,7 +3596,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x5A; 
         PatchRel32(stubBytes, jneStoryCapture, 6, p);
 
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3F;
@@ -3789,7 +3623,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x5A; 
         PatchRel32(stubBytes, jneBennyCapture, 6, p);
 
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3C;
@@ -3814,13 +3647,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         PatchRel32(stubBytes, jneExactMapBenny, 6, p);
         PatchRel32(stubBytes, jneExactMapGroup, 6, p);
 
-        
-        
-        
-        
-
-        
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3C;
@@ -3845,8 +3671,6 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         PatchRel32(stubBytes, jneExactStoryBenny, 6, p);
         PatchRel32(stubBytes, jneExactStoryGroup, 6, p);
 
-        
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x8B;
         stubBytes[p++] = 0x04;
@@ -3941,11 +3765,8 @@ struct C27931MidFilterProbeInstaller
     }
 };
 
-
-
-
-static C27931MidFilterProbeInstaller
-    g_c27931MidFilterProbeInstaller;
+static C27931MidFilterProbeInstaller*
+    g_c27931MidFilterProbeInstallerDisabled = nullptr;
 
 static void LogC27931MidFilterProbeState(
     const char* phase)
@@ -3975,7 +3796,6 @@ static void LogC27931MidFilterProbeState(
         static_cast<long>(
             g_midFilterRewrites));
 }
-
 
 static void C2A390ExtractorDetour(
     void* child,
@@ -4136,7 +3956,7 @@ static void C2A390ExtractorDetour(
         }
         __except(EXCEPTION_EXECUTE_HANDLER)
         {
-            
+
         }
     }
 
@@ -4247,8 +4067,6 @@ static void InstallC2A390ExtractorProbeAtModuleLoad()
             return;
         }
 
-        
-        
         static const uint8_t expectedPrefix[16] =
         {
             0x41, 0x57,
@@ -4351,9 +4169,6 @@ static void InstallC2A390ExtractorProbeAtModuleLoad()
             trampoline,
             trampolineSize);
 
-        
-        
-        
         g_groupExtractorTrampoline =
             trampoline;
         g_groupExtractorOriginal =
@@ -4481,7 +4296,6 @@ static void LogC2A390ExtractorProbeState(
         static_cast<unsigned int>(
             g_groupExtractorLastBennyCountAfter));
 }
-
 
 static bool VerifyV46BennyPairOnChild(
     void* child)
@@ -4649,8 +4463,7 @@ static uintptr_t V46C27740SourcePairDetour(
 
     __try
     {
-        
-        
+
         originalResult =
             original(
                 child,
@@ -4775,17 +4588,6 @@ static void InstallV46C27740SourcePairHookAtModuleLoad()
         g_v46C27740PrefixVerified =
             true;
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         static const uint8_t expectedTailArgs[29] =
         {
             0x41, 0x8B, 0x07,
@@ -4929,9 +4731,6 @@ static void InstallV46C27740SourcePairHookAtModuleLoad()
     }
 }
 
-
-
-
 static const char* GetV49OverlayFailureReason()
 {
     switch (g_v49OverlayFailureCode)
@@ -5057,12 +4856,10 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(&g_v49OverlaySiteHits));
         bytes[p++]=0xF0; bytes[p++]=0xFF; bytes[p++]=0x00;
 
-        
         bytes[p++]=0x41; bytes[p++]=0x81; bytes[p++]=0x3F;
         memcpy(bytes+p,&groupMap,sizeof(groupMap)); p+=sizeof(groupMap);
         const size_t jneGroup=p; bytes[p++]=0x0F; bytes[p++]=0x85; p+=4;
 
-        
         bytes[p++]=0x41; bytes[p++]=0x81; bytes[p++]=0x3C; bytes[p++]=0x24;
         memcpy(bytes+p,&benny,sizeof(benny)); p+=sizeof(benny);
         const size_t jneBenny=p; bytes[p++]=0x0F; bytes[p++]=0x85; p+=4;
@@ -5070,7 +4867,6 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(&g_v49OverlayBennyHits));
         bytes[p++]=0xF0; bytes[p++]=0xFF; bytes[p++]=0x00;
 
-        
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(&g_v49OverlayLastOriginalGroup));
         bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0F; 
         bytes[p++]=0x89; bytes[p++]=0x08; 
@@ -5079,7 +4875,6 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0C; bytes[p++]=0x24; 
         bytes[p++]=0x89; bytes[p++]=0x08;
 
-        
         bytes[p++]=0x41; bytes[p++]=0xC7; bytes[p++]=0x07;
         memcpy(bytes+p,&groupMapSp,sizeof(groupMapSp)); p+=sizeof(groupMapSp);
 
@@ -5090,14 +4885,12 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         PatchRel32(bytes,jneGroup,6,classify);
         PatchRel32(bytes,jneBenny,6,classify);
 
-        
         bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x07; 
         bytes[p++]=0x3D; memcpy(bytes+p,&groupMapSp,sizeof(groupMapSp)); p+=sizeof(groupMapSp);
         const size_t jeAccept=p; bytes[p++]=0x0F; bytes[p++]=0x84; p+=4;
         bytes[p++]=0x3D; memcpy(bytes+p,&groupMap,sizeof(groupMap)); p+=sizeof(groupMap);
         const size_t jneReject=p; bytes[p++]=0x0F; bytes[p++]=0x85; p+=4;
 
-        
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(base+acceptRva));
         bytes[p++]=0xFF; bytes[p++]=0xE0;
 
@@ -5252,8 +5045,6 @@ static bool V48C2D560Detour(void* context)
             InterlockedIncrement(&g_v48OriginalFalseHits);
         }
 
-        
-        
         returnedResult = originalResult;
         g_v48LastReturnedResult = returnedResult;
     }
@@ -5552,13 +5343,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
             return;
         }
 
-        
-        
-        
-        
-        
-        
-        
         static const uint8_t expectedSite[15] =
         {
             0x41, 0x8B, 0x0C, 0x24,
@@ -5605,13 +5389,12 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         const uint32_t mplowrider =
             0x61322A35U;
 
-        
         EmitMovRaxImm64(
             bytes,
             p,
             reinterpret_cast<uint64_t>(
                 &g_v47SyntheticActive));
-        
+
         bytes[p++] = 0x83;
         bytes[p++] = 0x38;
         bytes[p++] = 0x01;
@@ -5620,7 +5403,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         bytes[p++] = 0x85;
         p += 4;
 
-        
         bytes[p++] = 0x41;
         bytes[p++] = 0x81;
         bytes[p++] = 0x3C;
@@ -5635,7 +5417,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         bytes[p++] = 0x85;
         p += 4;
 
-        
         bytes[p++] = 0x41;
         bytes[p++] = 0x81;
         bytes[p++] = 0x3F;
@@ -5649,7 +5430,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         bytes[p++] = 0x85;
         p += 4;
 
-        
         bytes[p++] = 0x41;
         bytes[p++] = 0x81;
         bytes[p++] = 0xBE;
@@ -5667,7 +5447,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         bytes[p++] = 0x85;
         p += 4;
 
-        
         EmitMovRaxImm64(
             bytes,
             p,
@@ -5677,8 +5456,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
         bytes[p++] = 0xFF;
         bytes[p++] = 0x00; 
 
-        
-        
         EmitMovRaxImm64(
             bytes,
             p,
@@ -5710,7 +5487,6 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
             6,
             passThrough);
 
-        
         memcpy(
             bytes + p,
             expectedSite,
@@ -5814,10 +5590,6 @@ struct V46C27740SourcePairHookInstaller
     }
 };
 
-
-
-
-
 static V49OverlayClassificationHookInstaller*
     g_v49OverlayClassificationHookInstallerDisabled = nullptr;
 
@@ -5827,9 +5599,8 @@ static V48C2D560GateHookInstaller*
 static V47Setup2MembershipBypassInstaller*
     g_v47Setup2MembershipBypassInstallerDisabled = nullptr;
 
-static V46C27740SourcePairHookInstaller
-    g_v46C27740SourcePairHookInstaller;
-
+static V46C27740SourcePairHookInstaller*
+    g_v46C27740SourcePairHookInstallerDisabled = nullptr;
 
 static uintptr_t ResolveDirectCallsiteToTarget(
     uintptr_t callerReturn,
@@ -5868,11 +5639,6 @@ static uintptr_t ResolveDirectCallsiteToTarget(
         if (resolved == expectedTarget)
             return candidate;
 
-        
-        
-        
-        
-        
         if (g_v78C25F4ECallsiteHookInstalled
             && candidate == g_v78C25F4ECallsite
             && resolved == g_v78C25F4EBridge
@@ -5906,7 +5672,6 @@ static uintptr_t ResolveDirectCallsiteToTarget(
     }
 }
 
-
 static uintptr_t V51C272A0OuterCallerDetour(
     void* context,
     void* arg2,
@@ -5935,9 +5700,6 @@ static uintptr_t V51C272A0OuterCallerDetour(
                 ? base + 0x00C272A0ULL
                 : 0);
 
-    
-    
-    
     const LONG downstreamLowriderBefore =
         InterlockedCompareExchange(
             &g_v46LowriderCalls,
@@ -5976,8 +5738,6 @@ static uintptr_t V51C272A0OuterCallerDetour(
     constexpr uint32_t v84Benny = 0x4CDFC843U;
     constexpr uint32_t v84Lowrider = 0x61322A35U;
 
-    
-    
 #pragma warning(suppress: 6237)
     const bool v84ExactOverlayWorker =
         g_v85EnhancedOverlayExperiment
@@ -6003,8 +5763,6 @@ static uintptr_t V51C272A0OuterCallerDetour(
         g_v84OverlayWorkerGroupBefore = groupBefore;
         g_v84OverlayWorkerAssociatedBefore = associatedBefore;
 
-        
-        
         v84OverlayPresented =
             TryApplyV82OverlayDescriptorForNaturalCall(
                 reinterpret_cast<uintptr_t>(arg2));
@@ -6023,8 +5781,7 @@ static uintptr_t V51C272A0OuterCallerDetour(
 
     __try
     {
-        
-        
+
         originalResult =
             original(
                 context,
@@ -6160,7 +5917,6 @@ static uintptr_t V51C272A0OuterCallerDetour(
     return originalResult;
 }
 
-
 static const char* GetV51C272A0FailureReason()
 {
     switch (g_v51C272A0FailureCode)
@@ -6179,7 +5935,6 @@ static const char* GetV51C272A0FailureReason()
     default: return "unknown";
     }
 }
-
 
 static void InstallV51C272A0OuterCallerProbeAtModuleLoad()
 {
@@ -6246,11 +6001,6 @@ static void InstallV51C272A0OuterCallerProbeAtModuleLoad()
             return;
         }
 
-        
-        
-        
-        
-        
         static const uint8_t expectedPrefix[14] =
         {
             0x41, 0x57,
@@ -6428,7 +6178,6 @@ static void InstallV51C272A0OuterCallerProbeAtModuleLoad()
     }
 }
 
-
 struct V51C272A0OuterCallerProbeInstaller
 {
     V51C272A0OuterCallerProbeInstaller()
@@ -6437,13 +6186,8 @@ struct V51C272A0OuterCallerProbeInstaller
     }
 };
 
-
-
-
-
-static V51C272A0OuterCallerProbeInstaller
-    g_v51C272A0OuterCallerProbeInstaller;
-
+static V51C272A0OuterCallerProbeInstaller*
+    g_v51C272A0OuterCallerProbeInstallerDisabled = nullptr;
 
 static bool FindEnhancedV93UniqueDirectCall(
     uint8_t* functionStart,
@@ -6487,10 +6231,6 @@ static bool FindEnhancedV93UniqueDirectCall(
     return matches == 1 && callsite != nullptr;
 }
 
-
-
-
-
 static bool ValidateEnhancedV94DirectCallsite(
     uint8_t* functionStart,
     uint8_t* functionEnd,
@@ -6519,7 +6259,6 @@ static bool ValidateEnhancedV94DirectCallsite(
         == expectedTarget;
 }
 
-
 static bool ResolveEnhancedV93StructuralPathAtModuleLoad()
 {
     g_enhancedV93 = EnhancedV93StructuralSemanticState{};
@@ -6542,10 +6281,6 @@ static bool ResolveEnhancedV93StructuralPathAtModuleLoad()
 
     g_enhancedV93.imageRangeValid = true;
 
-    
-    
-    
-    
     constexpr uint64_t c25610Rva = 0x00C25610ULL;
     constexpr uint64_t c26f00Rva = 0x00C26F00ULL;
     constexpr uint64_t c272a0Rva = 0x00C272A0ULL;
@@ -6625,10 +6360,6 @@ static bool ResolveEnhancedV93StructuralPathAtModuleLoad()
     g_enhancedV93.c272a0End =
         reinterpret_cast<uintptr_t>(c272a0End);
 
-    
-    
-    
-    
     uint8_t* ownerFirstCallsite = nullptr;
     uint32_t ownerMatches = 0;
     g_enhancedV93.uniqueOwnerCall =
@@ -6689,9 +6420,6 @@ static bool ResolveEnhancedV93StructuralPathAtModuleLoad()
         g_enhancedV93.expectedOwnerCall
         && g_enhancedV93.expectedWorkerCall;
 
-    
-    
-    
     static const uint8_t expectedPrefix[16] =
     {
         0x41, 0x57,
@@ -6726,7 +6454,6 @@ static bool ResolveEnhancedV93StructuralPathAtModuleLoad()
 
     return g_enhancedV93.structuralVerified;
 }
-
 
 static void EvaluateEnhancedV93SemanticContextFromV52Observations()
 {
@@ -6843,10 +6570,6 @@ static void EvaluateEnhancedV93SemanticContextFromV52Observations()
         &g_enhancedV93.childIndex64Hits,
         child64);
 
-    
-    
-    
-    
     g_enhancedV93.semanticVerified =
         g_enhancedV93.gameVersionConfirmed
         && g_enhancedV93.structuralVerified
@@ -6855,7 +6578,6 @@ static void EvaluateEnhancedV93SemanticContextFromV52Observations()
         && contextReadable > 0
         && childMembership > 0;
 }
-
 
 static void LogEnhancedV93StructuralSemanticState(
     const char* phase)
@@ -6951,11 +6673,6 @@ static void LogEnhancedV93StructuralSemanticState(
         g_enhancedV93.lastChildField80);
 }
 
-
-
-
-
-
 static bool ValidateEnhancedV95LiveContextMembership(
     void* context,
     void* child,
@@ -7006,12 +6723,75 @@ static bool ValidateEnhancedV95LiveContextMembership(
     return true;
 }
 
-
 static uintptr_t V52C26F00SourceIteratorCallerDetour(
     void* context,
     void* child,
     uint32_t* groupHash)
 {
+    RockstarC26F00GroupLoop1012 original =
+        g_v52OriginalC26F00;
+
+    if (!original)
+        return 0;
+
+    const LONG completedMutationAttempts =
+        InterlockedCompareExchange(
+            &g_enhancedV100.mutationAttempts,
+            0,
+            0);
+    const LONG completedInjected =
+        InterlockedCompareExchange(
+            &g_enhancedV100.injected,
+            0,
+            0);
+    const LONG completedAlreadyPresent =
+        InterlockedCompareExchange(
+            &g_enhancedV100.alreadyPresent,
+            0,
+            0);
+    const LONG completedRestoreVerified =
+        InterlockedCompareExchange(
+            &g_enhancedV100.restoreVerified,
+            0,
+            0);
+    const LONG completedRestoreFailures =
+        InterlockedCompareExchange(
+            &g_enhancedV100.restoreFailures,
+            0,
+            0);
+    const LONG descriptorActive =
+        InterlockedCompareExchange(
+            &g_v54DescriptorActive,
+            0,
+            0);
+
+    const bool bennyMutationSettled =
+        g_enhancedV100.liveLayoutResolved
+        && completedMutationAttempts == 1
+        && completedRestoreFailures == 0
+        && descriptorActive == 0
+        && ((completedInjected == 1
+                && completedAlreadyPresent == 0
+                && completedRestoreVerified == 1)
+            || (completedInjected == 0
+                && completedAlreadyPresent == 1
+                && completedRestoreVerified == 0));
+
+    if (bennyMutationSettled)
+    {
+        __try
+        {
+            return original(
+                context,
+                child,
+                groupHash);
+        }
+        __except(EXCEPTION_EXECUTE_HANDLER)
+        {
+            return 0;
+        }
+    }
+
     const LONG globalCallNumber =
         InterlockedIncrement(
             &g_v52C26F00TotalCalls);
@@ -7074,15 +6854,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
         childField80 = 0;
     }
 
-    RockstarC26F00GroupLoop1012 original =
-        g_v52OriginalC26F00;
-
-    if (!original)
-        return 0;
-
-    
-    
-    
     constexpr uint32_t storyGroup =
         0x578F99E2U;
     constexpr uint32_t benny =
@@ -7105,10 +6876,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
     bool descriptorWriteComplete = false;
     bool descriptorAlreadyPresent = false;
 
-    
-    
-    
-    
     bool v100ChildContainsLowriderHash = false;
     if (child)
     {
@@ -7139,10 +6906,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
         && groupHashValue == storyGroup
         && v100ChildContainsLowriderHash;
 
-    
-    
-    
-    
     const bool v96ComparisonCall =
         g_enhancedV93.structuralVerified
         && g_enhancedV93.gameVersionConfirmed
@@ -7215,9 +6978,7 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
 
     if (structurallyQualifiedNaturalStoryCall)
     {
-        
-        
-        
+
         const LONG upstreamOrdinal =
             InterlockedCompareExchange(
                 &g_v78C25F4ECallsiteTotalCalls,
@@ -7233,9 +6994,7 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
 
         if (g_v79EnhancedLateReplayExperiment)
         {
-            
-            
-            
+
             InterlockedIncrement(
                 &g_v79NaturalInjectionSuppressedHits);
         }
@@ -7357,9 +7116,7 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
                     1,
                     0) == 0)
             {
-                
-                
-                
+
                 descriptorSwapped = true;
 
                 if (originalDescriptorCount != 0)
@@ -7483,9 +7240,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
     {
         bool restored = false;
 
-        
-        
-        
         for (int restoreTry = 0;
              restoreTry < 2 && !restored;
              ++restoreTry)
@@ -7573,9 +7327,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
             0,
             0);
 
-    
-    
-    
     if (exactNaturalStoryCall
         && descriptorWriteComplete
         && downstreamAfter > downstreamBefore)
@@ -7592,7 +7343,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
             &g_v55DownstreamMapBennyProducedHits);
     }
 
-    
     if (exactNaturalStoryCall
         && descriptorWriteComplete
         && exactStoryBennyAfter
@@ -7673,7 +7423,6 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
     return originalResult;
 }
 
-
 static const char* GetV52C26F00FailureReason()
 {
     switch (g_v52C26F00FailureCode)
@@ -7694,7 +7443,6 @@ static const char* GetV52C26F00FailureReason()
     }
 }
 
-
 static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
 {
     if (!IsEnhancedExecutableImage())
@@ -7702,9 +7450,6 @@ static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
 
     g_v52C26F00HookAttempted = true;
 
-    
-    
-    
     const bool v100BootstrapReady =
         ResolveEnhancedV100StructuralBootstrapAtModuleLoad();
 
@@ -7781,9 +7526,6 @@ static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
             return;
         }
 
-        
-        
-        
         static const uint8_t expectedPrefix[16] =
         {
             0x41, 0x57,
@@ -7836,9 +7578,6 @@ static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
         g_v52C26F00C272A0CallVerified =
             true;
 
-        
-        
-        
         g_v52C26F00MapStateWasNull = false;
         if (getGameVersion() == 1012)
         {
@@ -7976,13 +7715,8 @@ struct V52C26F00SourceIteratorCallerProbeInstaller
     }
 };
 
-
-
-
-
 static V52C26F00SourceIteratorCallerProbeInstaller
     g_v52C26F00SourceIteratorCallerProbeInstaller;
-
 
 static const char* GetV78C25F4ECallsiteFailureReason()
 {
@@ -8004,7 +7738,6 @@ static const char* GetV78C25F4ECallsiteFailureReason()
     default: return "unknown";
     }
 }
-
 
 static uint8_t* AllocateExecutableNearV78Callsite(
     uintptr_t callsite,
@@ -8100,7 +7833,6 @@ static uint8_t* AllocateExecutableNearV78Callsite(
     return nullptr;
 }
 
-
 static bool EmitV78StoreRegToR11Disp32(
     uint8_t* code,
     size_t capacity,
@@ -8123,7 +7855,6 @@ static bool EmitV78StoreRegToR11Disp32(
     return true;
 }
 
-
 static bool EmitV78Byte(
     uint8_t* code,
     size_t capacity,
@@ -8136,7 +7867,6 @@ static bool EmitV78Byte(
     code[position++] = value;
     return true;
 }
-
 
 static bool EmitV78Dword(
     uint8_t* code,
@@ -8152,7 +7882,6 @@ static bool EmitV78Dword(
     return true;
 }
 
-
 static bool EmitV78Qword(
     uint8_t* code,
     size_t capacity,
@@ -8166,7 +7895,6 @@ static bool EmitV78Qword(
     position += sizeof(value);
     return true;
 }
-
 
 static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
 {
@@ -8296,8 +8024,6 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
         g_v78C25F4EMapStateWasNull =
             (mapState == 0);
 
-        
-        
         if (mapState != 0)
         {
             g_v78C25F4ECallsiteFailureCode = 7;
@@ -8326,13 +8052,11 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
 
         bool emitted = true;
 
-        
         emitted = emitted && V78_EMIT8(0x9C);             
         emitted = emitted && V78_EMIT8(0x50);             
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x52); 
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x53); 
 
-        
         emitted = emitted && V78_EMIT8(0x49) && V78_EMIT8(0xBB)
             && V78_EMIT64(reinterpret_cast<uint64_t>(
                 &g_v78C25F4ECallsiteTotalCalls));          
@@ -8359,7 +8083,6 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
         emitted = emitted && V78_EMIT8(0x4D) && V78_EMIT8(0x01)
             && V78_EMIT8(0xD3);                             
 
-        
         emitted = emitted && EmitV78StoreRegToR11Disp32(
             bridge, bridgeCapacity, pos, 0x49, 0x8B, 0x00); 
         emitted = emitted && EmitV78StoreRegToR11Disp32(
@@ -8385,7 +8108,6 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
         emitted = emitted && EmitV78StoreRegToR11Disp32(
             bridge, bridgeCapacity, pos, 0x4D, 0xBB, 0x70); 
 
-        
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8B)
             && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x10); 
         emitted = emitted && EmitV78StoreRegToR11Disp32(
@@ -8408,9 +8130,6 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
         emitted = emitted && EmitV78StoreRegToR11Disp32(
             bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x80); 
 
-        
-        
-        
         for (uint32_t i = 0; emitted && i < 8; ++i)
         {
             const uint8_t stackDisp =
@@ -8452,14 +8171,11 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
             emitted = false;
         }
 
-        
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5B); 
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5A); 
         emitted = emitted && V78_EMIT8(0x58);                
         emitted = emitted && V78_EMIT8(0x9D);                
 
-        
-        
         emitted = emitted && V78_EMIT8(0xFF) && V78_EMIT8(0x25)
             && V78_EMIT32(0)
             && V78_EMIT64(reinterpret_cast<uint64_t>(c26f00));
@@ -8541,7 +8257,6 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
     }
 }
 
-
 struct V78C25F4ECallsiteProbeInstaller
 {
     V78C25F4ECallsiteProbeInstaller()
@@ -8550,14 +8265,8 @@ struct V78C25F4ECallsiteProbeInstaller
     }
 };
 
-
-
-
-
-
 static V78C25F4ECallsiteProbeInstaller*
     g_v78C25F4ECallsiteProbeInstallerDisabled = nullptr;
-
 
 static void LogV46C27740SourcePairState(
     const char* phase)
@@ -8682,8 +8391,6 @@ static void LogV50LowriderCallerObservations(
     }
 }
 
-
-
 static void LogV51C272A0OuterCallerObservations(
     const char* phase)
 {
@@ -8801,7 +8508,6 @@ static void LogV51C272A0OuterCallerObservations(
     }
 }
 
-
 static void LogV52C26F00SourceIteratorCallerObservations(
     const char* phase)
 {
@@ -8917,7 +8623,6 @@ static void LogV52C26F00SourceIteratorCallerObservations(
                 o.originalResult));
     }
 }
-
 
 static void LogV78PointerFingerprint(
     const char* label,
@@ -9064,7 +8769,6 @@ static void LogV78PointerFingerprint(
     }
 }
 
-
 static void LogV78EnhancedReplayProbeState(
     const char* phase)
 {
@@ -9160,8 +8864,6 @@ static void LogV78EnhancedReplayProbeState(
         reinterpret_cast<void*>(s.stackQword[6]),
         reinterpret_cast<void*>(s.stackQword[7]));
 
-    
-    
     LogV78PointerFingerprint("C25F4E_CALL.RCX", s.rcx);
     LogV78PointerFingerprint("C25F4E_CALL.RDX", s.rdx);
     LogV78PointerFingerprint("C25F4E_CALL.R8", s.r8);
@@ -9174,7 +8876,6 @@ static void LogV78EnhancedReplayProbeState(
     LogV78PointerFingerprint("C25F4E_CALL.R14", s.r14);
     LogV78PointerFingerprint("C25F4E_CALL.R15", s.r15);
 }
-
 
 static void LogV48CombinedOverlayState(const char* phase)
 {
@@ -9269,8 +8970,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
             return;
         }
 
-        
-        
         static const uint8_t expectedSite[16] =
         {
             0x81, 0xFB, 0xE2, 0x99, 0x8F, 0x57,
@@ -9287,12 +8986,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         }
         g_preDiscardPairSiteVerified = true;
 
-        
-        
-        
-        
-        
-        
         static const uint8_t expectedGroupLoad[11] =
         {
             0x45, 0x89, 0xCE,
@@ -9311,13 +9004,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         }
         g_preDiscardPairGroupLoadVerified = true;
 
-        
-        
-        
-        
-        
-        
-        
         static const uint8_t expectedRegistryLoop[18] =
         {
             0x44, 0x3B, 0x45, 0x00,
@@ -9379,7 +9065,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         auto emitEbxCompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0xFB;
             memcpy(stubBytes + p, &value, sizeof(value));
@@ -9395,7 +9081,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         auto emitR8dCompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x41;
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0xF8;
@@ -9414,9 +9100,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         const uint32_t benny = 0x4CDFC843U;
         const uint32_t dlc = 0x61322A35U;
 
-        
-        
-        
         stubBytes[p++] = 0x50;             
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x52;             
@@ -9435,7 +9118,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
             dlc,
             &g_preDiscardPairDlcKeyHits);
 
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
         memcpy(stubBytes + p, &groupMap, sizeof(groupMap));
@@ -9457,7 +9139,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         stubBytes[p++] = 0x10;             
         PatchRel32(stubBytes, jneMapCapture, 6, p);
 
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
         memcpy(stubBytes + p, &groupMapSp, sizeof(groupMapSp));
@@ -9479,7 +9160,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         stubBytes[p++] = 0x10;             
         PatchRel32(stubBytes, jneStoryCapture, 6, p);
 
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xF8;
@@ -9513,7 +9193,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         stubBytes[p++] = 0x10;             
         PatchRel32(stubBytes, jneBennyCapture, 6, p);
 
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
         memcpy(stubBytes + p, &groupMap, sizeof(groupMap));
@@ -9535,7 +9214,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         PatchRel32(stubBytes, jneExactMapBenny, 6, p);
         PatchRel32(stubBytes, jneExactMapGroup, 6, p);
 
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
         memcpy(stubBytes + p, &groupMapSp, sizeof(groupMapSp));
@@ -9561,8 +9239,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         stubBytes[p++] = 0x5A;             
         stubBytes[p++] = 0x58;             
 
-        
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
         memcpy(stubBytes + p, &groupMapSp, sizeof(groupMapSp));
@@ -9618,7 +9294,6 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
             sizeof(patchDisplacement));
         patch[5] = 0x90;
 
-        
         g_preDiscardPairStub = stub;
 
         DWORD oldProtect = 0;
@@ -9664,7 +9339,6 @@ struct C27E80PreDiscardPairProbeInstaller
     }
 };
 
-
 static C27E80PreDiscardPairProbeInstaller*
     g_c27e80PreDiscardPairProbeInstallerDisabled = nullptr;
 
@@ -9695,7 +9369,6 @@ static void LogC27E80PreDiscardPairProbeState(
         g_preDiscardPairLastGroupWhenBenny,
         reinterpret_cast<void*>(g_preDiscardPairLastGroupPointerWhenBenny));
 }
-
 
 static const char* GetPreFilterFailureReason()
 {
@@ -9777,8 +9450,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             return;
         }
 
-        
-        
         static const uint8_t expectedPrefix[19] =
         {
             0x41, 0x57,
@@ -9807,11 +9478,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
 
         g_preFilterPrefixVerified = true;
 
-        
-        
-        
-        
-        
         static const uint8_t expectedCompare[16] =
         {
             0x41, 0x8B, 0x04, 0x24,
@@ -9831,10 +9497,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
 
         g_preFilterCompareVerified = true;
 
-        
-        
-        
-        
         static const uint8_t expectedTailArgs[29] =
         {
             0x41, 0x8B, 0x07,
@@ -9912,11 +9574,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             trampoline,
             trampolineSize);
 
-        
-        
-        
-        
-        
         uint8_t stubBytes[512]{};
         size_t p = 0;
 
@@ -9935,7 +9592,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         auto emitRdxCompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0x3A;
             memcpy(stubBytes + p, &value, sizeof(value));
@@ -9953,7 +9610,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         auto emitR8CompareAndCount =
             [&](uint32_t value, volatile LONG* counter)
         {
-            
+
             stubBytes[p++] = 0x41;
             stubBytes[p++] = 0x81;
             stubBytes[p++] = 0x38;
@@ -9969,10 +9626,8 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             PatchRel32(stubBytes, jne, 6, p);
         };
 
-        
         emitCounterIncrement(&g_preFilterTotalCalls);
 
-        
         stubBytes[p++] = 0x48;
         stubBytes[p++] = 0x85;
         stubBytes[p++] = 0xD2;
@@ -9981,7 +9636,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         stubBytes[p++] = 0x84;
         p += 4;
 
-        
         stubBytes[p++] = 0x4D;
         stubBytes[p++] = 0x85;
         stubBytes[p++] = 0xC0;
@@ -10005,9 +9659,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         emitR8CompareAndCount(benny, &g_preFilterR8Benny);
         emitR8CompareAndCount(dlc, &g_preFilterR8Dlc);
 
-        
-        
-        
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x38;
@@ -10042,7 +9693,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         stubBytes[p++] = 0x89;
         stubBytes[p++] = 0x00; 
 
-        
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x8B;
         stubBytes[p++] = 0x12;
@@ -10050,7 +9700,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             stubBytes,
             p,
             reinterpret_cast<uint64_t>(&g_preFilterGroupWhenR8Benny));
-        
+
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
         stubBytes[p++] = 0x10;
@@ -10061,7 +9711,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             6,
             p);
 
-        
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0x3A;
         memcpy(stubBytes + p, &benny, sizeof(benny));
@@ -10071,7 +9720,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
         stubBytes[p++] = 0x85;
         p += 4;
 
-        
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x8B;
         stubBytes[p++] = 0x10;
@@ -10091,7 +9739,6 @@ static void InstallC27740PreFilterHookAtModuleLoad()
 
         const size_t passThrough = p;
 
-        
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -10200,10 +9847,6 @@ struct C27740PreFilterHookInstaller
     }
 };
 
-
-
-
-
 static C27740PreFilterHookInstaller*
     g_c27740PreFilterHookInstallerDisabled = nullptr;
 
@@ -10256,8 +9899,6 @@ static void DumpBuild1012OwnerGateState()
     const uint64_t imageSize =
         static_cast<uint64_t>(end - base);
 
-    
-    
     const uint64_t ownerStateRva = 0x03E31ACCULL;
     const uint64_t ownerSubStateRva = 0x03E31AD0ULL;
     const uint64_t ownerModeRva = 0x03E320E8ULL;
@@ -10370,29 +10011,6 @@ static void LogBytes(const void* address, size_t count, const char* label)
     Logf("[Diag] %s @ %p: %s", label, address, line);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 using RockstarLegacyNaturalGroupLoop =
     uintptr_t(*)(
         void* context,
@@ -10487,13 +10105,6 @@ static uint16_t g_legacyV57DescriptorCandidateCount = 0;
 static LegacyV57DescriptorCandidate
     g_legacyV57DescriptorCandidates[16]{};
 
-
-
-
-
-
-
-
 struct LegacyV59HeapRecordCandidate
 {
     uintptr_t hashAddress;
@@ -10523,7 +10134,6 @@ static uint16_t g_legacyV59SelectedScore = 0;
 static uint16_t g_legacyV59BestScoreTies = 0;
 static bool g_legacyV59SelectedUnique = false;
 
-
 static bool IsReadableLegacyV57Protection(
     DWORD protect)
 {
@@ -10542,7 +10152,6 @@ static bool IsReadableLegacyV57Protection(
         || basic == PAGE_EXECUTE_READWRITE
         || basic == PAGE_EXECUTE_WRITECOPY;
 }
-
 
 static bool GetLegacyV57ReadableSpan(
     uintptr_t address,
@@ -10591,7 +10200,6 @@ static bool GetLegacyV57ReadableSpan(
     return readable != 0;
 }
 
-
 static void CaptureLegacyV57LowriderRecord(
     uintptr_t child,
     LONG index,
@@ -10636,7 +10244,6 @@ static void CaptureLegacyV57LowriderRecord(
         g_legacyV57LowriderGroup =
             groupHash;
 
-        
         for (uint16_t offset = 0;
              offset + sizeof(uint32_t)
                 <= childSize;
@@ -10671,9 +10278,6 @@ static void CaptureLegacyV57LowriderRecord(
             }
         }
 
-        
-        
-        
         for (uint16_t offset = 0;
              offset + sizeof(uintptr_t)
                 <= childSize;
@@ -10754,10 +10358,6 @@ static void CaptureLegacyV57LowriderRecord(
             }
         }
 
-        
-        
-        
-        
         for (uint16_t offset = 0;
              offset + sizeof(uintptr_t)
                     + sizeof(uint16_t)
@@ -10929,7 +10529,6 @@ static void CaptureLegacyV57LowriderRecord(
     }
 }
 
-
 static bool IsWritableLegacyV59PrivateProtection(
     DWORD protect)
 {
@@ -10944,7 +10543,6 @@ static bool IsWritableLegacyV59PrivateProtection(
     return basic == PAGE_READWRITE
         || basic == PAGE_WRITECOPY;
 }
-
 
 static uint16_t CountReadableLegacyV59PointerFields(
     uintptr_t child)
@@ -10986,7 +10584,6 @@ static uint16_t CountReadableLegacyV59PointerFields(
 
     return count;
 }
-
 
 static bool ReadLegacyV59NeighborField60(
     uintptr_t child,
@@ -11033,7 +10630,6 @@ static bool ReadLegacyV59NeighborField60(
     }
 }
 
-
 static void ResetLegacyV59HeapScanTelemetry()
 {
     g_legacyV59HeapScanCompleted = false;
@@ -11055,7 +10651,6 @@ static void ResetLegacyV59HeapScanTelemetry()
     g_legacyV59SelectedUnique = false;
 }
 
-
 static void DiscoverLegacyV59PostConstructionLowriderRecord(
     bool forceRescan)
 {
@@ -11065,7 +10660,6 @@ static void DiscoverLegacyV59PostConstructionLowriderRecord(
         return;
     }
 
-    
     if (g_legacyV57LowriderRecordCaptured)
         return;
 
@@ -11087,8 +10681,6 @@ static void DiscoverLegacyV59PostConstructionLowriderRecord(
     constexpr uint64_t maxScanBytes =
         3ULL * 1024ULL * 1024ULL * 1024ULL;
 
-    
-    
     uint32_t stackMarker = mplowrider;
     MEMORY_BASIC_INFORMATION stackMbi{};
     uintptr_t stackAllocationBase = 0;
@@ -11273,10 +10865,6 @@ static void DiscoverLegacyV59PostConstructionLowriderRecord(
                                         score += 2;
                                     }
 
-                                    
-                                    
-                                    
-                                    
                                     if (pointerFields >= 2
                                         && ((havePrevious
                                                 && previousField60 != 0)
@@ -11353,10 +10941,6 @@ static void DiscoverLegacyV59PostConstructionLowriderRecord(
         g_legacyV59SelectedChild != 0
         && g_legacyV59BestScoreTies == 1;
 
-    
-    
-    
-    
     if (g_legacyV59SelectedUnique)
     {
         CaptureLegacyV57LowriderRecord(
@@ -11367,7 +10951,6 @@ static void DiscoverLegacyV59PostConstructionLowriderRecord(
 
     g_legacyV59HeapScanCompleted = true;
 }
-
 
 static void LogLegacyV59PostConstructionState(
     const char* phase)
@@ -11428,12 +11011,6 @@ static void LogLegacyV59PostConstructionState(
                 : "");
     }
 }
-
-
-
-
-
-
 
 static void LogLegacyV60DeepCandidateAnalysis(
     const char* phase)
@@ -11734,16 +11311,6 @@ static void LogLegacyV60DeepCandidateAnalysis(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 struct LegacyV61DescriptorState
 {
     bool attempted;
@@ -11778,7 +11345,6 @@ static LegacyV61DescriptorState g_legacyV61{};
 static uint8_t g_legacyV61DescriptorScratch[65 * 0x18]{};
 static uint32_t g_legacyV61MapAssociatedScratch[512]{};
 static uint32_t g_legacyV61StoryAssociatedScratch[1] = { 0x4CDFC843U };
-
 
 static bool InspectLegacyV61DescriptorFingerprint(
     uintptr_t child,
@@ -11939,7 +11505,7 @@ static bool InspectLegacyV61DescriptorFingerprint(
 
         if (requireStock)
         {
-            
+
             valid = descriptorCount == 2
                 && mapDescriptorIndex == 1
                 && mapAssociatedCount == 4
@@ -11958,7 +11524,6 @@ static bool InspectLegacyV61DescriptorFingerprint(
 
     return valid;
 }
-
 
 static bool RestoreLegacyV61DescriptorView()
 {
@@ -12073,9 +11638,7 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
     }
     else
     {
-        
-        
-        
+
         DiscoverLegacyV59PostConstructionLowriderRecord(false);
 
         for (uint16_t i = 0;
@@ -12138,11 +11701,6 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
     g_legacyV61.storyBennyBefore =
         selectedStoryBennyCount;
 
-    
-    
-    
-    
-    
     uint16_t selectedDescriptorCapacity = 0;
     uint16_t selectedMapAssociatedCapacity = 0;
     bool capacityMetadataReadable = false;
@@ -12254,9 +11812,6 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
             &mapScratchCount,
             sizeof(mapScratchCount));
 
-        
-        
-        
         memcpy(
             mapDescriptor + 0x12,
             &selectedMapAssociatedCapacity,
@@ -12283,8 +11838,7 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
             storyDescriptor + 0x10,
             &one,
             sizeof(one));
-        
-        
+
         memcpy(
             storyDescriptor + 0x12,
             &one,
@@ -12296,9 +11850,6 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
         const uint16_t temporaryCount =
             static_cast<uint16_t>(selectedCount + 1);
 
-        
-        
-        
         uint16_t temporaryCapacity =
             selectedDescriptorCapacity;
         if (temporaryCapacity == 0)
@@ -12415,7 +11966,6 @@ static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
     return true;
 }
 
-
 static void LogLegacyV61DescriptorState(
     const char* phase)
 {
@@ -12444,7 +11994,6 @@ static void LogLegacyV61DescriptorState(
         static_cast<unsigned int>(g_legacyV61.temporaryMapAssociatedCapacity),
         static_cast<unsigned int>(g_legacyV61.temporaryStoryAssociatedCapacity));
 }
-
 
 static uintptr_t LegacyNaturalGroupLoopDetour(
     void* context,
@@ -12582,7 +12131,6 @@ static uintptr_t LegacyNaturalGroupLoopDetour(
         groupHash);
 }
 
-
 static const char* GetLegacyNaturalFailureReason()
 {
     switch (g_legacyNaturalFailureCode)
@@ -12601,7 +12149,6 @@ static const char* GetLegacyNaturalFailureReason()
     default: return "unknown";
     }
 }
-
 
 static bool IsAddressInExecutableSectionV57(
     const IMAGE_NT_HEADERS64* nt,
@@ -12646,7 +12193,6 @@ static bool IsAddressInExecutableSectionV57(
     return false;
 }
 
-
 static void InstallLegacyNaturalDescriptorHookAtModuleLoad()
 {
     if (!IsLegacyExecutableImage())
@@ -12686,12 +12232,6 @@ static void InstallLegacyNaturalDescriptorHookAtModuleLoad()
             return;
         }
 
-        
-        
-        
-        
-        
-        
         static const uint8_t groupLoopSignature[] =
         {
             0x48, 0x89, 0x5C, 0x24, 0x08,
@@ -12887,7 +12427,6 @@ static void InstallLegacyNaturalDescriptorHookAtModuleLoad()
             target,
             sizeof(g_legacyNaturalTargetPrefix));
 
-        
         uint8_t* workerCallsite =
             target + (sizeof(groupLoopSignature) - 1);
         int32_t workerRelative = 0;
@@ -12921,8 +12460,6 @@ static void InstallLegacyNaturalDescriptorHookAtModuleLoad()
             workerTarget,
             sizeof(g_legacyV57WorkerPrefix));
 
-        
-        
         constexpr size_t stolenSize = 15;
         static const uint8_t expectedPrefix[stolenSize] =
         {
@@ -13037,21 +12574,16 @@ static void InstallLegacyNaturalDescriptorHookAtModuleLoad()
     }
 }
 
-
 struct LegacyNaturalDescriptorHookInstaller
 {
     LegacyNaturalDescriptorHookInstaller()
     {
-        
-        
-        
+
     }
 };
 
-
 static LegacyNaturalDescriptorHookInstaller
     g_legacyNaturalDescriptorHookInstaller;
-
 
 static void LogLegacyNaturalDescriptorState(
     const char* phase)
@@ -13291,7 +12823,6 @@ static void LogLegacyNaturalDescriptorState(
     }
 }
 
-
 static void DumpPeSections(uint8_t* base)
 {
     if (!base)
@@ -13404,7 +12935,6 @@ static void DumpQwordHitsInRange(
             rangeLabel ? rangeLabel : "unknown");
     }
 }
-
 
 static bool FindRuntimeFunctionBounds(
     uint8_t* base,
@@ -13660,8 +13190,6 @@ static void DumpNearbyRipRelativeTargets(
         if (opcode != 0x8D && opcode != 0x8B && opcode != 0x89)
             continue;
 
-        
-        
         if (prefixSize == 0
             && p > start
             && ((p[-1] & 0xF0) == 0x40))
@@ -13788,8 +13316,6 @@ static void DumpRipRelativeReferences(
     int hits = 0;
     const int maxHits = 16;
 
-    
-    
     for (uint8_t* p = base; p + 7 <= end; ++p)
     {
         const uint8_t rex = p[0];
@@ -13832,15 +13358,7 @@ static void DumpRipRelativeReferences(
         Logf("[Diag] No common RIP-relative xrefs found for %s.", label ? label : "target");
 }
 
-
-
-
-
-
-
-
 static bool g_legacyV62ConsumerMapLogged = false;
-
 
 static void DumpLegacyV62DirectCallXrefs(
     uint8_t* base,
@@ -13965,7 +13483,6 @@ static void DumpLegacyV62DirectCallXrefs(
         hits);
 }
 
-
 static uint8_t* FindLegacyV62FiveMGroupLoop(
     uint8_t* base,
     uint8_t* end)
@@ -14018,7 +13535,7 @@ static uint8_t* FindLegacyV62FiveMGroupLoop(
              p + 15 <= scanEnd;
              ++p)
         {
-            
+
             if (p[0] != 0x75
                 || p[1] != 0x0D
                 || p[2] != 0xBA
@@ -14077,7 +13594,6 @@ static uint8_t* FindLegacyV62FiveMGroupLoop(
         ? resolvedTarget
         : nullptr;
 }
-
 
 static void DumpLegacyV62GroupPairFunctions(
     uint8_t* base,
@@ -14250,7 +13766,6 @@ static void DumpLegacyV62GroupPairFunctions(
     }
 }
 
-
 static void LogLegacyV62ConsumerMap(
     bool force)
 {
@@ -14352,17 +13867,7 @@ static void LogLegacyV62ConsumerMap(
         "[LegacyConsumerV62] mapping complete. Use pairFunction/xref caller boundaries to select the next state-transition observation point; v62 performs no Legacy descriptor mutation.");
 }
 
-
-
-
-
-
-
-
-
-
 static bool g_legacyV63StateOwnerMapLogged = false;
-
 
 static bool FindLegacyV63SingleDirectCaller(
     uint8_t* base,
@@ -14451,7 +13956,6 @@ static bool FindLegacyV63SingleDirectCaller(
         && callerEnd
         && callerEnd > callerStart;
 }
-
 
 static unsigned int DumpLegacyV63DirectCallXrefs(
     uint8_t* base,
@@ -14581,7 +14085,6 @@ static unsigned int DumpLegacyV63DirectCallXrefs(
     return hits;
 }
 
-
 static bool FindLegacyV63FiveMAnchor(
     uint8_t* base,
     uint8_t* end,
@@ -14642,7 +14145,7 @@ static bool FindLegacyV63FiveMAnchor(
              p + 15 <= scanEnd;
              ++p)
         {
-            
+
             if (p[0] != 0x75
                 || p[1] != 0x0D
                 || p[2] != 0xBA
@@ -14685,7 +14188,6 @@ static bool FindLegacyV63FiveMAnchor(
         && ownerEnd > ownerStart
         && callsite;
 }
-
 
 static void ValidateLegacyV63WrapperOwnerContext(
     uint8_t* base,
@@ -14928,7 +14430,6 @@ static void ValidateLegacyV63WrapperOwnerContext(
     }
 }
 
-
 static void DumpLegacyV63DualLoopOwners(
     uint8_t* base,
     uint8_t* end,
@@ -15071,7 +14572,6 @@ static void DumpLegacyV63DualLoopOwners(
         "[LegacyConsumerV63] dual-loop lifecycle owner summary count=%u.",
         static_cast<unsigned int>(owners.size()));
 }
-
 
 static void LogLegacyV63StateOwnerMap(
     bool force)
@@ -15253,9 +14753,6 @@ static void LogLegacyV63StateOwnerMap(
         "[LegacyConsumerV63] validation complete. Next decision should be based on owner caller relationships and the live-context fingerprint; v63 did not invoke any Legacy consumer or apply the v61 descriptor view.");
 }
 
-
-
-
 struct LegacyV66VectorInvariantState
 {
     bool attempted;
@@ -15271,7 +14768,6 @@ struct LegacyV66VectorInvariantState
 
 static LegacyV66VectorInvariantState
     g_legacyV66Vector{};
-
 
 static bool InspectLegacyV66TemporaryVectorInvariants(
     uintptr_t child)
@@ -15398,16 +14894,6 @@ static bool InspectLegacyV66TemporaryVectorInvariants(
     return valid;
 }
 
-
-
-
-
-
-
-
-
-
-
 struct LegacyV67DerivedSetup2Snapshot
 {
     bool attempted;
@@ -15422,7 +14908,6 @@ struct LegacyV67DerivedSetup2Snapshot
     uint32_t first[16];
     uint32_t second[16];
 };
-
 
 static LegacyV67DerivedSetup2Snapshot
 CaptureLegacyV67DerivedSetup2Snapshot(
@@ -15537,7 +15022,6 @@ CaptureLegacyV67DerivedSetup2Snapshot(
     return snapshot;
 }
 
-
 static void LogLegacyV67DerivedCodeMap(
     uint8_t* base,
     uint8_t* end,
@@ -15552,8 +15036,7 @@ static void LogLegacyV67DerivedCodeMap(
 
     __try
     {
-        
-        
+
         if (prePass + 0x37 <= end
             && prePass[0x29] == 0xF6
             && prePass[0x2A] == 0x81
@@ -15654,11 +15137,6 @@ static void LogLegacyV67DerivedCodeMap(
         }
     }
 
-    
-    
-    
-    
-    
     if (helperCallVerified && helper && helper + 0x50 <= end)
     {
         bool pairDispatchVerified = false;
@@ -15852,23 +15330,11 @@ static void LogLegacyV67DerivedCodeMap(
     }
 }
 
-
 static void LogMemoryWindowSized(
     uintptr_t hitAddress,
     size_t before,
     size_t after,
     const char* label);
-
-
-
-
-
-
-
-
-
-
-
 
 static bool InspectLegacyV68WorkingDescriptorFingerprint(
     uintptr_t child,
@@ -16051,7 +15517,6 @@ static bool InspectLegacyV68WorkingDescriptorFingerprint(
     return valid;
 }
 
-
 static uintptr_t FindLegacyV68UniqueWorkingLowriderChild()
 {
     uintptr_t selected = 0;
@@ -16098,7 +15563,6 @@ static uintptr_t FindLegacyV68UniqueWorkingLowriderChild()
 
     return matches == 1 ? selected : 0;
 }
-
 
 static void LogLegacyV68DerivedSpanFingerprint(
     uintptr_t child,
@@ -16285,19 +15749,6 @@ static void LogLegacyV68DerivedSpanFingerprint(
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 struct LegacyV69DerivedViewState
 {
     bool attempted;
@@ -16322,7 +15773,6 @@ struct LegacyV69DerivedViewState
 
 static LegacyV69DerivedViewState g_legacyV69Derived{};
 alignas(8) static uint32_t g_legacyV69DerivedScratch[3][2]{};
-
 
 static bool RestoreLegacyV69DerivedView()
 {
@@ -16388,7 +15838,6 @@ static bool RestoreLegacyV69DerivedView()
 
     return restored;
 }
-
 
 static bool ApplyLegacyV69DerivedView(
     uintptr_t child)
@@ -16606,21 +16055,6 @@ static bool ApplyLegacyV69DerivedView(
     return true;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 using RockstarLegacyV64NaturalOwner =
     uintptr_t(*)(uint32_t ownerArg);
 
@@ -16659,11 +16093,6 @@ struct LegacyV64OwnerReplayState
 };
 
 static LegacyV64OwnerReplayState g_legacyV64{};
-
-
-
-
-
 
 static bool GetLegacyV86RuntimeFunctionTable(
     uint8_t* base,
@@ -16712,7 +16141,6 @@ static bool GetLegacyV86RuntimeFunctionTable(
     count = exceptionDirectory.Size / sizeof(RUNTIME_FUNCTION);
     return table && count != 0;
 }
-
 
 static bool ResolveLegacyV86Rel32Call(
     uint8_t* base,
@@ -16764,7 +16192,6 @@ static bool ResolveLegacyV86Rel32Call(
     return true;
 }
 
-
 static uint8_t* FindLegacyV86Bytes(
     uint8_t* start,
     uint8_t* finish,
@@ -16788,7 +16215,6 @@ static uint8_t* FindLegacyV86Bytes(
 
     return nullptr;
 }
-
 
 static bool FindLegacyV86GroupHashCall(
     uint8_t* base,
@@ -16816,7 +16242,7 @@ static bool FindLegacyV86GroupHashCall(
              p + 5 <= functionEnd;
              ++p)
         {
-            
+
             if (p[0] != 0xBA)
                 continue;
 
@@ -16866,7 +16292,6 @@ static bool FindLegacyV86GroupHashCall(
 
     return matches == 1 && callsite && target;
 }
-
 
 static bool ValidateLegacyV86GroupLoopSemantics(
     uint8_t* base,
@@ -16964,7 +16389,6 @@ static bool ValidateLegacyV86GroupLoopSemantics(
     return valid;
 }
 
-
 static bool FindLegacyV86OwnerForWrapper(
     uint8_t* base,
     uint8_t* end,
@@ -17000,9 +16424,6 @@ static bool FindLegacyV86OwnerForWrapper(
             if (static_cast<size_t>(candidateEnd - candidateStart) != 0x32)
                 continue;
 
-            
-            
-            
             uint8_t* candidateCallsite = candidateStart + 0x27;
             uint8_t* resolved = nullptr;
             if (!ResolveLegacyV86Rel32Call(
@@ -17038,7 +16459,6 @@ static bool FindLegacyV86OwnerForWrapper(
         && ownerStart
         && ownerEnd;
 }
-
 
 static bool ResolveLegacyV86StructuralOwner(
     uint8_t* base,
@@ -17080,8 +16500,6 @@ static bool ResolveLegacyV86StructuralOwner(
         return false;
     }
 
-    
-    
     uint8_t* constructionStart = nullptr;
     uint8_t* constructionEnd = nullptr;
     uint8_t* mutatorStart = nullptr;
@@ -17270,9 +16688,6 @@ static bool ResolveLegacyV86StructuralOwner(
     workerCallsite = selectedWorkerCall;
     workerTarget = selectedWorkerTarget;
 
-    
-    
-    
     g_legacyNaturalSignatureAddress =
         reinterpret_cast<uintptr_t>(wrapper);
     g_legacyV58WrapperAddress =
@@ -17355,7 +16770,6 @@ static bool ResolveLegacyV86StructuralOwner(
     return true;
 }
 
-
 static bool ResolveLegacyV64NaturalOwner(
     uint8_t* base,
     uint8_t* end,
@@ -17406,8 +16820,6 @@ static bool ResolveLegacyV64NaturalOwner(
         return false;
     }
 
-    
-    
     if (static_cast<size_t>(ownerEnd - ownerStart) != 0x32)
         return false;
 
@@ -17533,9 +16945,6 @@ static bool ResolveLegacyV64NaturalOwner(
         return false;
     }
 
-    
-    
-    
     static const uint8_t prePassFlagTest[] =
     {
         0xF6, 0x81, 0xE8, 0x00, 0x00, 0x00, 0x04
@@ -17692,7 +17101,6 @@ static bool ResolveLegacyV64NaturalOwner(
         mapBennyCount,
         storyBennyCount);
 }
-
 
 static bool RunLegacyV64NaturalOwnerReplay()
 {
@@ -17919,11 +17327,6 @@ static bool RunLegacyV64NaturalOwnerReplay()
             RockstarLegacyV64NaturalOwner>(
             ownerStart);
 
-    
-    
-    
-    
-    
     __try
     {
         g_legacyV64.ownerResult = owner(0U);
@@ -18028,10 +17431,6 @@ static bool RunLegacyV64NaturalOwnerReplay()
     return g_legacyV64.completed;
 }
 
-
-
-
-
 static bool RunLegacyV70DerivedConsumerMap()
 {
     if (!IsLegacyExecutableImage() || getGameVersion() != 102) return false;
@@ -18073,15 +17472,6 @@ static bool RunLegacyV70DerivedConsumerMap()
     LogLegacyV67DerivedCodeMap(base, end, prePass);
     return true;
 }
-
-
-
-
-
-
-
-
-
 
 static bool RunLegacyV71ConstructionModeMap()
 {
@@ -18422,9 +17812,6 @@ static bool RunLegacyV71ConstructionModeMap()
             "v71 mode-minus-one companion");
     }
 
-    
-    
-    
     uint8_t* generalWrapper =
         base + 0x952E08;
     uint8_t* cleanupWrapper =
@@ -18542,13 +17929,6 @@ static bool RunLegacyV71ConstructionModeMap()
     return complete;
 }
 
-
-
-
-
-
-
-
 static bool RunLegacyV72ConstructionOwnerMap()
 {
     const bool v71Resolved =
@@ -18576,9 +17956,6 @@ static bool RunLegacyV72ConstructionOwnerMap()
 
     uint8_t* end = base + nt->OptionalHeader.SizeOfImage;
 
-    
-    
-    
     uint8_t* constructionOwner = base + 0x92A4B8;
     uint8_t* addMutator = base + 0x95443C;
     uint8_t* addCallsite = base + 0x92A985;
@@ -18634,9 +18011,6 @@ static bool RunLegacyV72ConstructionOwnerMap()
                     resolvedCallTarget == addMutator;
             }
 
-            
-            
-            
             uint8_t* scanStart =
                 addCallsite >= ownerStart + 0x20
                     ? addCallsite - 0x20
@@ -19424,16 +18798,6 @@ static void DumpProcessMemoryHashHits()
                         }
                     }
 
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
-                    
                     const uint32_t dlcHash = Joaat(kDlcName);
                     const uint8_t descriptorFirstByte =
                         static_cast<uint8_t>(dlcHash & 0xFF);
@@ -19894,9 +19258,7 @@ static void DumpProcessMemoryStringHits()
 
 static void DumpMapGroupLocator(uint8_t* base, uint8_t* end)
 {
-    
-    
-    
+
     const char* signature = "75 0D BA E2 99 8F 57";
     uint8_t* hit = FindPatternSig(base, end, signature);
 
@@ -19932,7 +19294,6 @@ static void DumpMapGroupLocator(uint8_t* base, uint8_t* end)
         Logf("[Diag] Expected E8 call was not present at locator+10; build layout differs.");
     }
 }
-
 
 static void LogHashesInReadableWindow(
     uintptr_t address,
@@ -20312,7 +19673,6 @@ static void DumpRipXrefsToSelectedGlobals(
     }
 }
 
-
 static bool ReadProcessExact(
     uintptr_t address,
     void* destination,
@@ -20513,7 +19873,6 @@ static void DumpRegistryChainForKey1012(
         node = nextNode;
     }
 }
-
 
 struct BennyGroupPatchCandidate
 {
@@ -20961,8 +20320,6 @@ static void CollectBennyGroupPatchCandidates1012(
             candidates.size()));
 }
 
-
-
 struct BennyOverlayProbeItem
 {
     uintptr_t address;
@@ -21015,10 +20372,6 @@ static bool IsEligibleBennyOverlayPayloadPointer1012(
         || !IsReadablePointerValue(pointerValue))
         return false;
 
-    
-    
-    
-    
     if (pointerValue >= bennyNode
         && pointerValue < bennyNode + 0xD8)
         return false;
@@ -21278,9 +20631,6 @@ static void DumpBennyOverlayReachabilityProbe1012(
             }
         }
 
-        
-        
-        
         for (SIZE_T offset = 0;
              offset + (sizeof(uint32_t) * 5) <= bytesRead;
              offset += sizeof(uint32_t))
@@ -21420,20 +20770,6 @@ static void DumpBennyOverlayReachabilityProbe1012(
             "[OverlayProbe] Reachable exact Benny descriptor(s) still carry GROUP_MAP. This is a high-value overlayinfo candidate, but v41 remains observation-only: no descriptor DWORD is rewritten.");
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 static void DumpBennyOverlayLocalDescriptorProbe1012(
     uint8_t* base,
@@ -21871,7 +21207,6 @@ static void DumpBennyOverlayLocalDescriptorProbe1012(
     }
 }
 
-
 static bool FindUniqueBennyOverlayDescriptor1012(
     uint8_t* base,
     uint8_t* end,
@@ -22049,8 +21384,6 @@ static bool FindUniqueBennyOverlayDescriptor1012(
 
                         ++exactHitCount;
 
-                        
-                        
                         if (record == 0)
                         {
                             record =
@@ -22438,8 +21771,6 @@ static void CollectBennyBackrefTargets1012(
             || !IsReadablePointerValue(pointerValue))
             continue;
 
-        
-        
         if (pointerValue >= bennyNode
             && pointerValue < bennyNode + 0x200)
             continue;
@@ -22856,10 +22187,6 @@ static void CollectBennyReverseOwnerCandidates1012(
                 bufferRegionStart,
                 bufferRegionEnd);
 
-        
-        
-        
-        
         if (preferredAllocation
             && !isSelfModule
             && !isCurrentStack
@@ -22957,9 +22284,6 @@ static void CollectBennyReverseOwnerCandidates1012(
                                     chunkAddress
                                     + candidateOffset;
 
-                                
-                                
-                                
                                 if (!(referenceAddress
                                         >= bennyNode
                                     && referenceAddress
@@ -23202,13 +22526,9 @@ static bool IsHighConfidenceBennyGroupPatchCandidate(
     if (distance > 0x200)
         return false;
 
-    
     if (candidate.directBennyNodeBackref)
         return true;
 
-    
-    
-    
     return candidate.sourcePointerOffset == 0x08;
 }
 
@@ -23701,10 +23021,6 @@ static void DumpMapRegistryCandidate1012(
         Joaat(kStoryMapGroup),
         "GROUP_MAP_SP");
 
-    
-    
-    
-    
     const uint32_t maxBucketsToEnumerate =
         bucketCount < 8192
             ? static_cast<uint32_t>(bucketCount)
@@ -23917,7 +23233,6 @@ static void DumpMapStateCandidate1012(
         512,
         "Map state candidate object");
 }
-
 
 struct EnhancedGroupEntryHit1012
 {
@@ -24228,12 +23543,6 @@ static void FindOwnersForExactBennyGroupPairs1012(
                             bytesRead)
                         / (1024ULL * 1024ULL);
 
-                    
-                    
-                    
-                    
-                    
-                    
                     for (SIZE_T offset = 0;
                          offset + 10 <= bytesRead;
                          offset += 8)
@@ -24803,8 +24112,6 @@ static void DumpMapGroupExtractionWrapper1012(
         directCalls,
         static_cast<unsigned long long>(callers.size()));
 
-    
-    
     for (const WrapperCaller& caller : callers)
     {
         if (caller.startRva == 0
@@ -26110,8 +25417,6 @@ static void DumpPersistentConfigBaseHelper1012(
             hits);
     }
 
-    
-    
     int calleeCount = 0;
     const int maxCallees = 32;
     for (uint8_t* p = helperStart;
@@ -26218,9 +25523,6 @@ static void DumpPersistentConfigBaseHelper1012(
         "[Diag] MAP GROUP CONFIG BASE HELPER CALLEE summary directCallees=%d.",
         calleeCount);
 
-    
-    
-    
     int directCalls = 0;
     int configCalls = 0;
     const int maxDirectCalls = 128;
@@ -26337,12 +25639,6 @@ static void DumpMapGroupKeyBlockLayoutProof1012(
         clearSize,
         tailOffset);
 
-    
-    
-    
-    
-    
-    
     bool leaMatches = false;
     bool sizeMatches = false;
     bool zeroMatches = false;
@@ -26397,9 +25693,6 @@ static void DumpMapGroupKeyBlockLayoutProof1012(
         64,
         "MAP GROUP KEY BLOCK PROOF constructor bytes");
 
-    
-    
-    
     uint8_t* thunk = base + static_cast<size_t>(memsetThunkRva);
     if (thunk[0] == 0xFF && thunk[1] == 0x25)
     {
@@ -26467,8 +25760,6 @@ static void DumpMapGroupKeyBlockLayoutProof1012(
     uint8_t tailByte = 0;
     memcpy(&tailByte, tailAddress, sizeof(tailByte));
 
-    
-    
     uint64_t fnv = 14695981039346656037ULL;
     for (uint32_t i = 0; i < clearSize; ++i)
     {
@@ -26731,8 +26022,6 @@ static void DumpMapGroupPersistentConfig1012(
         readableCount,
         bennyPresent ? "yes" : "no");
 
-    
-    
     for (uint32_t i = 0; i < 16; ++i)
     {
         uint32_t rawKey = 0;
@@ -26787,10 +26076,6 @@ static void DumpUpstreamContentFunctions1012(
         uint64_t rva;
     };
 
-    
-    
-    
-    
     const UpstreamFunction targets[] =
     {
         { "setup2 loader A",       0x00C2A890ULL },
@@ -26862,9 +26147,6 @@ static void DumpUpstreamContentFunctions1012(
                 functionEnd - functionStart),
             dumpLabel);
 
-        
-        
-        
         int callCount = 0;
         const int maxCalls = 96;
         for (uint8_t* p = functionStart;
@@ -27278,10 +26560,6 @@ static void DumpVerifiedMapStateChildGroupTables1012(
     unsigned int registryUnresolvedEntries = 0;
     unsigned int bennyAnywhereSecond = 0;
 
-    
-    
-    
-    
     if (childCount > 0)
     {
         uintptr_t child0Table = 0;
@@ -27302,11 +26580,6 @@ static void DumpVerifiedMapStateChildGroupTables1012(
             static_cast<unsigned int>(child0TableCount));
     }
 
-    
-    
-    
-    
-    
     const uint16_t focusChildIndex = 64;
     if (focusChildIndex < childCount)
     {
@@ -27404,8 +26677,6 @@ static void DumpVerifiedMapStateChildGroupTables1012(
                         : "");
             }
 
-            
-            
             LogMemoryWindowSized(
                 focusTable + logicalBytes,
                 32,
@@ -27609,10 +26880,6 @@ static void DumpChildTableFieldWriteCandidates1012(
         || getGameVersion() != 1012)
         return;
 
-    
-    
-    
-    
     const uint64_t scanStartRva = 0x00C20000ULL;
     const uint64_t scanEndRvaRequested = 0x00C40000ULL;
     const uint64_t imageSize =
@@ -27710,13 +26977,10 @@ static void DumpChildTableFieldWriteCandidates1012(
         if ((modrm & 0xC0) != 0x80)
             continue;
 
-        
-        
         if (opcode == 0xC7
             && (modrm & 0x38) != 0)
             continue;
 
-        
         size_t dispOffset = 2;
         if ((modrm & 0x07) == 0x04)
             dispOffset = 3;
@@ -27748,10 +27012,6 @@ static void DumpChildTableFieldWriteCandidates1012(
             && opcode == 0x89
             && prefix66;
 
-        
-        
-        
-        
         const bool countPacked32ValueStore =
             displacement == 0x110
             && opcode == 0x89
@@ -27766,7 +27026,6 @@ static void DumpChildTableFieldWriteCandidates1012(
             const size_t immediateOffset =
                 dispOffset + 4;
 
-            
             if (prefix66)
             {
                 if (q + immediateOffset + sizeof(uint16_t) > scanEnd)
@@ -27838,10 +27097,6 @@ static void DumpChildTableFieldWriteCandidates1012(
         candidate.immediateValue =
             immediateValue;
 
-        
-        
-        
-        
         bool duplicateCandidate = false;
         if (!candidates.empty())
         {
@@ -28084,9 +27339,6 @@ static void DumpChildTableFieldWriteCandidates1012(
                     functionSize));
         }
 
-        
-        
-        
         unsigned int internalCalls = 0;
         const unsigned int maxInternalCalls = 64;
 
@@ -28123,9 +27375,6 @@ static void DumpChildTableFieldWriteCandidates1012(
             ++internalCalls;
         }
 
-        
-        
-        
         unsigned int callerHits = 0;
         const unsigned int maxCallerHits = 24;
 
@@ -28186,9 +27435,6 @@ static void DumpChildTableFieldWriteCandidates1012(
         ++detailedFunctionCount;
     }
 
-    
-    
-    
     Logf(
         "[Diag] CHILD TABLE PRODUCER known negative-control: function RVA 0xC294E0 is the observed reset/destructor-like owner that clears count(+0x110), releases table(+0x108), and zeros both fields; do not use it as the injection target.");
 
@@ -28541,10 +27787,6 @@ static void DumpRelevantCoreMapGlobalXrefs1012(
     if (getGameVersion() != 1012)
         return;
 
-    
-    
-    
-    
     const uint64_t relevantStartRva = 0x00C20000ULL;
     const uint64_t relevantEndRva = 0x00C30000ULL;
 
@@ -28709,10 +27951,6 @@ static void DumpEnhancedCoreMapGlobals(
     if (!base || !end || end <= base)
         return;
 
-    
-    
-    
-    
     const uint64_t targetRvas[] =
     {
         0x29CAFC0ULL,
@@ -29060,9 +28298,6 @@ static void DumpV51C272A0OuterLoopTarget(
                 ? functionSize
                 : 4096;
 
-        
-        
-        
         for (size_t offset = 0;
              offset < dumpSize;
              offset += 16)
@@ -29144,7 +28379,6 @@ static void DumpV51C272A0OuterLoopTarget(
             directCallCount);
     }
 }
-
 
 static void DumpV78EnhancedReplayCandidates(
     uint8_t* base,
@@ -29326,9 +28560,6 @@ static void DumpV78EnhancedReplayCandidates(
             c26f00CallCount);
     }
 
-    
-    
-    
     int directCallerCount = 0;
     for (uint8_t* p = base;
          p + 5 <= end;
@@ -29372,7 +28603,6 @@ static void DumpV78EnhancedReplayCandidates(
         "[EnhancedReplayV78] C25610 directCallerCount=%d.",
         directCallerCount);
 }
-
 
 static void DumpV52C26F00SourceIteratorCallerTarget(
     uint8_t* base,
@@ -29594,7 +28824,6 @@ static void DumpV52C26F00SourceIteratorCallerTarget(
     }
 }
 
-
 static void RunDiagnostics(const char* reason)
 {
     if (!g_diagnosticsEnabled)
@@ -29726,9 +28955,6 @@ static void ActivateBennysInterior(const BennysMapState& state)
     if (!state.validInterior || state.selectedInteriorId == 0)
         return;
 
-    
-    
-    
     INTERIOR::DISABLE_INTERIOR(state.selectedInteriorId, false);
     STREAMING::SET_INTERIOR_ACTIVE(state.selectedInteriorId, true);
     INTERIOR::REFRESH_INTERIOR(state.selectedInteriorId);
@@ -29777,7 +29003,6 @@ static const char* GetV79LateReplayFailureReason()
     }
 }
 
-
 static void LogV79LateReplayState(const char* phase)
 {
     if (!IsEnhancedExecutableImage())
@@ -29811,11 +29036,9 @@ static void LogV79LateReplayState(const char* phase)
         g_v79LateReplayAvailableAfter ? "yes" : "no");
 }
 
-
 static bool RunV79EnhancedLateC26F00Replay()
 {
-    
-    
+
 #pragma warning(suppress: 6236)
     if (!IsEnhancedExecutableImage()
         || !g_v79EnhancedLateReplayExperiment)
@@ -29863,8 +29086,6 @@ static bool RunV79EnhancedLateC26F00Replay()
         return false;
     }
 
-    
-    
     if (g_v79LateReplayAvailableBefore)
     {
         g_v79LateReplayFailureCode = 2;
@@ -30060,8 +29281,6 @@ static bool RunV79EnhancedLateC26F00Replay()
                         g_v79LateReplayTemporaryDescriptorCount =
                             temporaryCount;
 
-                        
-                        
                         descriptorSwapClaimed = true;
                         memcpy(
                             reinterpret_cast<void*>(child + 0x98),
@@ -30178,7 +29397,6 @@ static bool RunV79EnhancedLateC26F00Replay()
             0,
             0);
 
-    
     if (child)
     {
         __try
@@ -30214,12 +29432,10 @@ static bool RunV79EnhancedLateC26F00Replay()
         }
         __except(EXCEPTION_EXECUTE_HANDLER)
         {
-            
+
         }
     }
 
-    
-    
     if (g_v79LateReplayCallCompleted
         && g_v79LateReplayDescriptorRestored)
     {
@@ -30277,7 +29493,6 @@ static bool RunV79EnhancedLateC26F00Replay()
     return success;
 }
 
-
 static void ExecuteBennysContentChangesetRaw()
 {
     const uint32_t dlcHash = Joaat(kDlcName);
@@ -30290,7 +29505,6 @@ static void ExecuteBennysContentChangesetRaw()
     nativePush64(static_cast<uint64_t>(changeSetHash));
     nativeCall();
 }
-
 
 static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
 {
@@ -30334,12 +29548,6 @@ static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
         return false;
     }
 
-    
-    
-    
-    
-    
-    
     static const uint8_t expectedMutatorPrefix[] =
     {
         0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54,
@@ -30366,9 +29574,6 @@ static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
         return false;
     }
 
-    
-    
-    
     uint8_t* verifiedCall =
         base + static_cast<size_t>(
             verifiedCallRva);
@@ -30400,9 +29605,6 @@ static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
         return false;
     }
 
-    
-    
-    
     static const uint8_t expectedPointerStore[] =
     {
         0x49, 0x89, 0xBE, 0x08, 0x01, 0x00, 0x00
@@ -30559,9 +29761,6 @@ static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
         return true;
     }
 
-    
-    
-    
     if (add)
     {
         if (countBefore != 2
@@ -30743,7 +29942,6 @@ static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
     return mutationVerified;
 }
 
-
 static bool TryReprocessEnhancedMapStateViaRockstar1012()
 {
     if (!IsEnhancedVersion()
@@ -30789,14 +29987,6 @@ static bool TryReprocessEnhancedMapStateViaRockstar1012()
         return false;
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
     static const uint8_t expectedProcessorPrefix[] =
     {
         0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54,
@@ -30823,9 +30013,6 @@ static bool TryReprocessEnhancedMapStateViaRockstar1012()
         return false;
     }
 
-    
-    
-    
     uint8_t* loadInstruction =
         base + static_cast<size_t>(
             verifiedLoadRva);
@@ -31297,9 +30484,7 @@ static bool TryReprocessEnhancedMapStateViaRockstar1012()
 
     if (!exactPairAfter)
     {
-        
-        
-        
+
         g_experimentalInternalGroupAddApplied = false;
 
         Logf(
@@ -31308,22 +30493,6 @@ static bool TryReprocessEnhancedMapStateViaRockstar1012()
 
     return true;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 struct LegacyV65OverlayCandidate
 {
@@ -31339,10 +30508,6 @@ struct LegacyV65OverlayCandidate
     int score;
     bool contiguousFiveDword;
 };
-
-
-
-
 
 struct LegacyV73OverlayGateState
 {
@@ -31385,9 +30550,6 @@ static unsigned long long LegacyV65AbsDistance(long value)
         : static_cast<unsigned long long>(value);
 }
 
-
-
-
 struct LegacyV88OverlayDiscoveryState
 {
     bool anchorResolved;
@@ -31404,13 +30566,6 @@ struct LegacyV88OverlayDiscoveryState
 };
 
 static LegacyV88OverlayDiscoveryState g_legacyV88OverlayDiscovery{};
-
-
-
-
-
-
-
 
 struct LegacyV89OverlayOwnerProbeState
 {
@@ -31444,9 +30599,6 @@ static bool IsLegacyV89PlausibleOverlayRow(
     if (!fields)
         return false;
 
-    
-    
-    
     return fields[0] != 0U
         && fields[1] != 0U
         && fields[2] != 0U
@@ -31468,8 +30620,6 @@ static void LogLegacyV89PointerNeighborhood(
         return;
     }
 
-    
-    
     constexpr intptr_t radius = 0x80;
     for (intptr_t relative = -radius;
          relative <= radius;
@@ -31515,13 +30665,6 @@ static void LogLegacyV89PointerNeighborhood(
                     : value));
     }
 }
-
-
-
-
-
-
-
 
 struct LegacyV91PointerRunProbe
 {
@@ -31987,9 +31130,6 @@ static void ProbeLegacyV91PointerTableOwners(
         cursor = regionEnd;
     }
 
-    
-    
-    
     uint8_t* exeBase = nullptr;
     uint8_t* exeEnd = nullptr;
     if (GetExeRange(exeBase, exeEnd)
@@ -32258,9 +31398,6 @@ static void ProbeLegacyV89OverlayOwner(
 
     g_legacyV89OverlayOwnerProbe.recordVerified = true;
 
-    
-    
-    
     for (int row = -6; row <= 6; ++row)
     {
         const intptr_t signedAddress =
@@ -32301,9 +31438,6 @@ static void ProbeLegacyV89OverlayOwner(
                 : "no");
     }
 
-    
-    
-    
     uintptr_t runStart = record;
     uintptr_t runEnd = record + rowSize;
     uint32_t runCount = 1;
@@ -32383,10 +31517,6 @@ static void ProbeLegacyV89OverlayOwner(
         static_cast<unsigned long long>(
             (record - runStart) / rowSize));
 
-    
-    
-    
-    
     constexpr SIZE_T chunkSize =
         1024ULL * 1024ULL;
     constexpr SIZE_T overlap =
@@ -32583,10 +31713,6 @@ static void ProbeLegacyV89OverlayOwner(
         reinterpret_cast<void*>(
             g_legacyV89OverlayOwnerProbe.firstRunStartPointer));
 
-    
-    
-    
-    
     const uint32_t trackedRecordPointers =
         g_legacyV89OverlayOwnerProbe.recordPointerHits
             < maxTrackedPointerSlots
@@ -32644,9 +31770,6 @@ static void ProbeLegacyV89OverlayOwner(
             allocationEnd);
     }
 
-    
-    
-    
     if (runStart != record)
     {
         const uint32_t trackedRunPointers =
@@ -32687,22 +31810,6 @@ static void ProbeLegacyV89OverlayOwner(
             allocationEnd);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 struct LegacyV92ContextRegistryState
 {
@@ -32798,16 +31905,6 @@ static bool GetLegacyV92AllocationBounds(
         && anchor < allocationEnd;
 }
 
-
-
-
-
-
-
-
-
-
-
 struct LegacyV98UniversalResolverState
 {
     bool attempted;
@@ -32895,7 +31992,6 @@ struct LegacyV98UniversalResolverState
 };
 
 static LegacyV98UniversalResolverState g_legacyV98{};
-
 
 static bool DecodeLegacyV98MemoryDisplacement(
     const uint8_t* instruction,
@@ -33005,7 +32101,6 @@ static bool DecodeLegacyV98MemoryDisplacement(
     return true;
 }
 
-
 static bool FindLegacyV98ImmediateCall(
     uint8_t* base,
     uint8_t* end,
@@ -33080,7 +32175,6 @@ static bool FindLegacyV98ImmediateCall(
     return matches == 1 && callsite && target;
 }
 
-
 static bool DiscoverLegacyV98Wrapper(
     uint8_t* base,
     uint8_t* end,
@@ -33149,10 +32243,6 @@ static bool DiscoverLegacyV98Wrapper(
 
             ++candidates;
 
-            
-            
-            
-            
             if (candidates <= 8)
             {
                 Logf(
@@ -33198,7 +32288,6 @@ static bool DiscoverLegacyV98Wrapper(
     g_legacyV98.groupLoopResolved = true;
     return true;
 }
-
 
 static bool DiscoverLegacyV98GroupLayout(
     uint8_t* base,
@@ -33438,7 +32527,6 @@ static bool DiscoverLegacyV98GroupLayout(
     return true;
 }
 
-
 static bool ValidateLegacyV98Context(
     uintptr_t context,
     uintptr_t& childArray,
@@ -33503,7 +32591,6 @@ static bool ValidateLegacyV98Context(
     return lowriderMatches == 1 && lowriderChild != 0;
 }
 
-
 static void CollectLegacyV98RipGlobals(
     uint8_t* functionStart,
     uint8_t* functionEnd,
@@ -33513,8 +32600,6 @@ static void CollectLegacyV98RipGlobals(
     if (!functionStart || !functionEnd || functionEnd <= functionStart)
         return;
 
-    
-    
     for (uint8_t* p = functionStart;
          p + 7 <= functionEnd;
          ++p)
@@ -33557,7 +32642,6 @@ static void CollectLegacyV98RipGlobals(
     }
 }
 
-
 static bool DiscoverLegacyV98Context(
     uint8_t* base,
     uint8_t* end,
@@ -33582,9 +32666,6 @@ static bool DiscoverLegacyV98Context(
     LONG selectedIndex = -1;
     uintptr_t selectedChild = 0;
 
-    
-    
-    
     for (size_t i = 0; i < tableCount; ++i)
     {
         const RUNTIME_FUNCTION& entry = table[i];
@@ -33690,7 +32771,6 @@ static bool DiscoverLegacyV98Context(
     return true;
 }
 
-
 static uint16_t CountLegacyV98AssociatedHash(
     uintptr_t table,
     uint16_t count,
@@ -33715,7 +32795,6 @@ static uint16_t CountLegacyV98AssociatedHash(
     }
     return matches;
 }
-
 
 static bool DiscoverLegacyV98DescriptorLayout()
 {
@@ -33924,7 +33003,6 @@ static bool DiscoverLegacyV98DescriptorLayout()
     return g_legacyV98.descriptorResolved;
 }
 
-
 static bool DiscoverLegacyV98DerivedLayout()
 {
     const uintptr_t child = g_legacyV98.lowriderChild;
@@ -34001,7 +33079,6 @@ static bool DiscoverLegacyV98DerivedLayout()
     return g_legacyV98.derivedResolved;
 }
 
-
 static bool MatchLegacyV98BennyOverlayRecord(
     uintptr_t record,
     uint32_t& group)
@@ -34024,7 +33101,6 @@ static bool MatchLegacyV98BennyOverlayRecord(
     group = fields[3];
     return true;
 }
-
 
 static bool ProbeLegacyV98OverlayRegistryAtOffset(
     uintptr_t context,
@@ -34096,7 +33172,6 @@ static bool ProbeLegacyV98OverlayRegistryAtOffset(
     return true;
 }
 
-
 static bool DiscoverLegacyV98OverlayRegistry()
 {
     if (!g_legacyV98.context || !g_legacyV98.lowriderChild)
@@ -34155,7 +33230,6 @@ static bool DiscoverLegacyV98OverlayRegistry()
     return g_legacyV98.overlayResolved;
 }
 
-
 static bool FunctionContainsLegacyV98DescriptorCountAccess(
     uint8_t* start,
     uint8_t* finish,
@@ -34195,7 +33269,6 @@ static bool FunctionContainsLegacyV98DescriptorCountAccess(
     return false;
 }
 
-
 static bool HasLegacyV98AddTrueSetup(
     uint8_t* functionStart,
     uint8_t* callsite)
@@ -34210,8 +33283,7 @@ static bool HasLegacyV98AddTrueSetup(
 
     for (uint8_t* p = scanStart; p + 3 <= callsite; ++p)
     {
-        
-        
+
         if (p[0] == 0x41 && p[1] == 0xB1 && p[2] == 0x01)
             return true;
 
@@ -34228,8 +33300,6 @@ static bool HasLegacyV98AddTrueSetup(
     }
     return false;
 }
-
-
 
 static bool DecodeLegacyV98LeaDestination(
     const uint8_t* instruction,
@@ -34308,7 +33378,6 @@ static bool DecodeLegacyV98LeaDestination(
     return instructionLength >= 2;
 }
 
-
 static bool HasLegacyV98PairPointerCallShape(
     uint8_t* functionStart,
     uint8_t* callsite)
@@ -34337,16 +33406,6 @@ static bool HasLegacyV98PairPointerCallShape(
             continue;
         }
 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
         if (destination == 2U)
             rdxPointer = true;
         else if (destination == 8U)
@@ -34358,7 +33417,6 @@ static bool HasLegacyV98PairPointerCallShape(
 
     return false;
 }
-
 
 static bool DiscoverLegacyV98Construction(
     uint8_t* base,
@@ -34494,7 +33552,6 @@ static bool DiscoverLegacyV98Construction(
     return true;
 }
 
-
 static void LogLegacyV98UniversalResolverState(
     const char* phase,
     uint8_t* base)
@@ -34576,7 +33633,6 @@ static void LogLegacyV98UniversalResolverState(
         g_legacyV98.faulted ? "yes" : "no");
 }
 
-
 static bool RunLegacyV98UniversalResolver(
     const char* phase)
 {
@@ -34643,9 +33699,6 @@ static bool RunLegacyV98UniversalResolver(
         && g_legacyV98.constructionResolved
         && !g_legacyV98.faulted;
 
-    
-    
-    
     if (g_legacyV98.gameVersion == 102)
     {
         g_legacyV98.knownBuildOracleChecked = true;
@@ -34670,15 +33723,6 @@ static bool RunLegacyV98UniversalResolver(
     LogLegacyV98UniversalResolverState(phase, base);
     return g_legacyV98.readyForMutationResearch;
 }
-
-
-
-
-
-
-
-
-
 
 struct EnhancedV99UniversalResolverState
 {
@@ -34741,7 +33785,6 @@ struct EnhancedV99UniversalResolverState
 
 static EnhancedV99UniversalResolverState g_enhancedV99{};
 
-
 static bool EnhancedV99PrefixEquals(
     uint8_t* start,
     uint8_t* finish,
@@ -34757,7 +33800,6 @@ static bool EnhancedV99PrefixEquals(
         && memcmp(start, prefix, prefixSize) == 0;
 }
 
-
 static bool EnhancedV99LooksLikeAbsoluteJump12(
     uint8_t* start,
     uint8_t* finish)
@@ -34771,7 +33813,6 @@ static bool EnhancedV99LooksLikeAbsoluteJump12(
         && start[10] == 0xFF
         && start[11] == 0xE0;
 }
-
 
 static uint32_t EnhancedV99CountDirectCallsToTarget(
     uint8_t* base,
@@ -34808,7 +33849,6 @@ static uint32_t EnhancedV99CountDirectCallsToTarget(
     return matches;
 }
 
-
 static bool DiscoverEnhancedV99StructuralChain(
     uint8_t* base,
     uint8_t* end,
@@ -34840,12 +33880,6 @@ static bool DiscoverEnhancedV99StructuralChain(
         0x48, 0x83, 0xEC, 0x30
     };
 
-    
-    
-    
-    
-    
-    
     struct ChainCandidate
     {
         uintptr_t groupLoop;
@@ -34924,9 +33958,6 @@ static bool DiscoverEnhancedV99StructuralChain(
             if (!naturalWorker && !detouredWorker)
                 continue;
 
-            
-            
-            
             const uint32_t workerCalls =
                 EnhancedV99CountDirectCallsToTarget(
                     base,
@@ -34969,10 +34000,6 @@ static bool DiscoverEnhancedV99StructuralChain(
         return false;
     }
 
-    
-    
-    
-    
     for (size_t i = 0; i < tableCount; ++i)
     {
         const RUNTIME_FUNCTION& rf = table[i];
@@ -34986,10 +34013,6 @@ static bool DiscoverEnhancedV99StructuralChain(
         uint8_t* ownerEnd = base + rf.EndAddress;
         uint32_t callsPerChain[maxChainCandidates]{};
 
-        
-        
-        
-        
         for (uint8_t* p = ownerStart; p + 5 <= ownerEnd; ++p)
         {
             if (p[0] != 0xE8)
@@ -35110,7 +34133,6 @@ static bool DiscoverEnhancedV99StructuralChain(
     return true;
 }
 
-
 static bool EnhancedV99IsOwnerGroupLoopCallsite(
     uint8_t* base,
     uint8_t* end,
@@ -35140,7 +34162,6 @@ static bool EnhancedV99IsOwnerGroupLoopCallsite(
     return ResolveLegacyV86Rel32Call(base, end, callsite, resolved)
         && resolved == reinterpret_cast<uint8_t*>(groupLoopAddress);
 }
-
 
 static bool DiscoverEnhancedV99LiveContext(
     uint8_t* base,
@@ -35207,7 +34228,6 @@ static bool DiscoverEnhancedV99LiveContext(
     return true;
 }
 
-
 static bool EnhancedV99ValidateChildLayoutCandidate(
     uintptr_t array,
     uint16_t count,
@@ -35249,13 +34269,6 @@ static bool EnhancedV99ValidateChildLayoutCandidate(
     uint32_t distinctSample[64]{};
     uint32_t distinctCount = 0;
 
-    
-    
-    
-    
-    
-    
-    
     const uint16_t sampleCount = count < 64 ? count : 64;
     for (uint16_t i = 0; i < count; ++i)
     {
@@ -35294,7 +34307,6 @@ static bool EnhancedV99ValidateChildLayoutCandidate(
     targetIndex = static_cast<LONG>(index);
     return true;
 }
-
 
 static bool DiscoverEnhancedV99ChildLayout()
 {
@@ -35344,11 +34356,6 @@ static bool DiscoverEnhancedV99ChildLayout()
             continue;
         }
 
-        
-        
-        
-        
-        
         const uint32_t countOff = arrayOff + static_cast<uint32_t>(sizeof(uintptr_t));
         if (countOff + sizeof(uint16_t) > 0x100)
             continue;
@@ -35436,7 +34443,6 @@ static bool DiscoverEnhancedV99ChildLayout()
     return true;
 }
 
-
 static bool EnhancedV99AssociatedContains(
     uintptr_t table,
     uint16_t count,
@@ -35465,7 +34471,6 @@ static bool EnhancedV99AssociatedContains(
     return true;
 }
 
-
 static bool DiscoverEnhancedV99DescriptorLayout()
 {
     if (!g_enhancedV99.layoutResolved || !g_enhancedV99.child)
@@ -35476,11 +34481,6 @@ static bool DiscoverEnhancedV99DescriptorLayout()
     constexpr uint32_t benny = 0x4CDFC843U;
     constexpr uint16_t maxAssociatedPerDescriptor = 256;
 
-    
-    
-    
-    
-    
     struct SourcePair
     {
         uint32_t group;
@@ -35528,9 +34528,6 @@ static bool DiscoverEnhancedV99DescriptorLayout()
             const uint32_t semanticGroup = semanticGroups[orientation];
             const uint32_t semanticValue = semanticAssociated[orientation];
 
-            
-            
-            
             if (semanticGroup == benny || semanticValue == benny)
                 continue;
 
@@ -35620,7 +34617,6 @@ static bool DiscoverEnhancedV99DescriptorLayout()
                 continue;
             }
 
-            
             (void)ReadProcessExact(
                 g_enhancedV99.child + vectorOff + 10,
                 &capacity,
@@ -35911,8 +34907,6 @@ static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad()
         return false;
     }
 
-    
-    
     static const uint8_t expectedGroupLoopPrefix[16] =
     {
         0x41, 0x57,
@@ -35950,7 +34944,6 @@ static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad()
     return true;
 }
 
-
 static bool ResolveEnhancedV100LiveMutationLayout(
     void* context,
     void* child,
@@ -35964,10 +34957,6 @@ static bool ResolveEnhancedV100LiveMutationLayout(
         return false;
     }
 
-    
-    
-    
-    
     if (g_enhancedV100.liveLayoutResolved)
         return false;
 
@@ -36293,10 +35282,6 @@ static bool ResolveEnhancedV100LiveMutationLayout(
                             break;
                     }
 
-                    
-                    
-                    
-                    
                     if (!valid
                         || mapDescriptors == 0
                         || mapBenny != 1
@@ -36393,7 +35378,6 @@ static bool ResolveEnhancedV100LiveMutationLayout(
     g_enhancedV100.liveLayoutResolved = true;
     return true;
 }
-
 
 static void LogEnhancedV100IntegrationState(
     const char* phase)
@@ -36517,7 +35501,6 @@ static void LogEnhancedV100IntegrationState(
                 0)));
 }
 
-
 static void LogEnhancedV99UniversalResolverState(
     const char* phase,
     uint8_t* base)
@@ -36584,7 +35567,6 @@ static void LogEnhancedV99UniversalResolverState(
         g_enhancedV99.faulted ? "yes" : "no");
 }
 
-
 static bool RunEnhancedV99UniversalResolver(
     const char* phase)
 {
@@ -36637,8 +35619,6 @@ static bool RunEnhancedV99UniversalResolver(
         && g_enhancedV99.descriptorResolved
         && !g_enhancedV99.faulted;
 
-    
-    
     if (g_enhancedV99.gameVersion == 1012)
     {
         g_enhancedV99.knownBuildOracleChecked = true;
@@ -36665,7 +35645,6 @@ static bool RunEnhancedV99UniversalResolver(
     LogEnhancedV99UniversalResolverState(phase, base);
     return g_enhancedV99.readyForMutationResearch;
 }
-
 
 static bool ResolveLegacyV92OverlayFromContextRegistry(
     const char* phase)
@@ -37001,7 +35980,6 @@ static bool ResolveLegacyV92OverlayFromContextRegistry(
 
     return true;
 }
-
 
 static bool ScanLegacyV88OverlayFromLowriderAllocation(
     const char* phase)
@@ -37707,9 +36685,6 @@ static void ScanLegacyV65OverlayCandidates(
         if (!haveDlc || !haveGroup)
             continue;
 
-        
-        
-        
         if (nearestDlcDistance > 0x80ULL
             || nearestGroupDistance > 0x80ULL)
         {
@@ -37892,15 +36867,6 @@ static void ScanLegacyV65OverlayCandidates(
             "[LegacyOverlayV65] Multiple plausible records remain. Use the stock-vs-edited overlayinfo A/B delta to select the exact Legacy classification field; no candidate is mutated in v65.");
     }
 }
-
-
-
-
-
-
-
-
-
 
 static bool ApplyLegacyV76OverlayStoryClassification()
 {
@@ -38093,21 +37059,6 @@ static bool VerifyLegacyV76OverlayStoryClassification()
     return verified;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 using RockstarLegacyV73ConstructionPairOwner =
     void(*)(void* child, uint32_t* group, uint32_t* associated);
 
@@ -38154,10 +37105,6 @@ struct LegacyV73ConstructionReplayState
 };
 
 static LegacyV73ConstructionReplayState g_legacyV73{};
-
-
-
-
 
 static bool g_legacyV87RetrySafe = false;
 static uint32_t g_legacyV87AutomaticRetryCount = 0;
@@ -38228,10 +37175,6 @@ static uint16_t CountLegacyV73DerivedPair(
     return hits;
 }
 
-
-
-
-
 static bool VerifyLegacyV73ConstructionOwnerAbi(
     uint8_t* base,
     uint8_t* end,
@@ -38260,7 +37203,6 @@ static bool VerifyLegacyV73ConstructionOwnerAbi(
         return false;
     }
 
-    
     static const uint8_t argumentCapture[] =
     {
         0x49, 0x8B, 0xF0,
@@ -38268,14 +37210,12 @@ static bool VerifyLegacyV73ConstructionOwnerAbi(
         0x48, 0x8B, 0xF9
     };
 
-    
     static const uint8_t descriptorGate[] =
     {
         0x44, 0x0F, 0xB7, 0x8F, 0x80, 0x00, 0x00, 0x00,
         0x41, 0x8B, 0x07
     };
 
-    
     static const uint8_t associatedRead[] = { 0x8B, 0x06 };
 
     bool argumentCaptureVerified = false;
@@ -38284,9 +37224,7 @@ static bool VerifyLegacyV73ConstructionOwnerAbi(
     bool readFaulted = false;
     __try
     {
-        
-        
-        
+
         argumentCaptureVerified =
             memcmp(
                 candidate + 0x1F,
@@ -38408,7 +37346,6 @@ static bool VerifyLegacyV77ConstructionAddSemantics(
     return verified;
 }
 
-
 static bool VerifyLegacyV73TemporaryDescriptor(
     uintptr_t child)
 {
@@ -38457,9 +37394,6 @@ static bool RunLegacyV73ConstructionPairReplay()
         return IsBennysMapAvailable(current);
     }
 
-    
-    
-    
     g_legacyV73 = LegacyV73ConstructionReplayState{};
 
     g_legacyV73.overlayVerified =
@@ -38561,9 +37495,7 @@ static bool RunLegacyV73ConstructionPairReplay()
 
     if (!ApplyLegacyV61DescriptorView(g_legacyV73.child))
     {
-        
-        
-        
+
         if (g_legacyV61.restoreFailed)
             g_legacyV73.attempted = true;
 
@@ -38622,9 +37554,6 @@ static bool RunLegacyV73ConstructionPairReplay()
             RockstarLegacyV73ConstructionPairOwner>(
                 constructionOwner);
 
-    
-    
-    
     g_legacyV73.attempted = true;
 
     __try
@@ -38726,7 +37655,7 @@ static bool TryLoadBennysMap(bool manualRetry)
     BennysMapState state = CaptureBennysMapState();
     if (IsBennysMapAvailable(state))
     {
-        
+
         if (IsLegacyExecutableImage()
             && getGameVersion() == 102
             && manualRetry
@@ -38902,10 +37831,6 @@ static bool TryLoadBennysMap(bool manualRetry)
         "[Info] %sLegacy v77 stock-XML stable path (v92 context-registry controller): v86 resolves the validated Legacy context, context+0x08 resolves Rockstar's overlay pointer registry, and exactly one verified Benny overlay row is selected without an allocation scan. v87 readiness retry and the one-shot 0x92A4B8 construction boundary are retained.",
         manualRetry ? "Manual " : "Automatic/initial ");
 
-    
-    
-    
-    
     if (manualRetry
         && g_diagnosticsEnabled
         && g_deepMemoryDiagnostics)
@@ -38925,11 +37850,6 @@ static bool TryLoadBennysMap(bool manualRetry)
         return IsBennysMapAvailable(state);
     }
 
-    
-    
-    
-    
-    
     const bool cachedOverlayReusable =
         !manualRetry && IsLegacyV87CachedStockOverlayReusable();
     if (cachedOverlayReusable)
@@ -38993,10 +37913,6 @@ static bool TryLoadBennysMap(bool manualRetry)
         return true;
     }
 
-    
-    
-    
-    
     if (IsLegacyV87ConstructionCommitted())
     {
         g_legacyV87RetrySafe = false;
@@ -39024,7 +37940,6 @@ static bool TryLoadBennysMap(bool manualRetry)
         g_legacyV87RetrySafe ? "yes" : "no");
     return false;
 }
-
 
 static bool IsEnhancedV100FrozenProductionHealthy()
 {
@@ -39111,7 +38026,6 @@ static bool IsEnhancedV100FrozenProductionHealthy()
         && restoreFailures == 0;
 }
 
-
 static bool IsProductionStartupSuccess(
     bool enhanced,
     bool loaded)
@@ -39124,7 +38038,6 @@ static bool IsProductionStartupSuccess(
 
     return IsEnhancedV100FrozenProductionHealthy();
 }
-
 
 static bool IsProductionStartupPending(
     bool enhanced,
@@ -39139,7 +38052,6 @@ static bool IsProductionStartupPending(
     return g_legacyV87RetrySafe
         || IsLegacyV87ConstructionCommitted();
 }
-
 
 static void EmitProductionFailureDiagnostics(
     bool enhanced,
@@ -39173,7 +38085,6 @@ static void EmitProductionFailureDiagnostics(
         reason);
 }
 
-
 static void ResolveProductionStartupLog(
     bool enhanced,
     bool loaded,
@@ -39203,7 +38114,6 @@ static void ResolveProductionStartupLog(
         failureReason);
 }
 
-
 void ScriptMain()
 {
     g_logEnabled =
@@ -39213,9 +38123,6 @@ void ScriptMain()
             "EnableLog",
             1) != 0);
 
-    
-    
-    
     g_diagnosticsEnabled = true;
     g_deepMemoryDiagnostics =
         (ReadIniInt(
@@ -39223,9 +38130,7 @@ void ScriptMain()
             "Settings",
             "DeepMemoryDiagnostics",
             0) != 0);
-    
-    
-    
+
     g_showNotification =
         g_showNotification
         && (ReadIniInt(
@@ -39234,8 +38139,6 @@ void ScriptMain()
             "ShowNotification",
             1) != 0);
 
-    
-    
     g_experimentalMemoryPatch = false;
     g_experimentalInternalGroupAdd = false;
     g_experimentalMapStateReprocess = false;
@@ -39253,9 +38156,6 @@ void ScriptMain()
             (gameVersion == 1012);
     }
 
-    
-    
-    
     if (!enhanced
         && gameVersion == 102
         && g_deepMemoryDiagnostics
@@ -39286,7 +38186,7 @@ void ScriptMain()
     Logf("[Info] Logging=%s diagnostics=%s deepMemoryDiagnostics=%s experimentalMemoryPatch=%s experimentalInternalGroupAdd=%s experimentalMapStateReprocess=%s experimentalOverlayDescriptorRewrite=%s", g_logEnabled ? "on" : "off", g_diagnosticsEnabled ? "on" : "off", g_deepMemoryDiagnostics ? "on" : "off", g_experimentalMemoryPatch ? "on" : "off", g_experimentalInternalGroupAdd ? "on" : "off", g_experimentalMapStateReprocess ? "on" : "off", g_experimentalOverlayDescriptorRewrite ? "on" : "off");
     if (enhanced)
     {
-        Logf("[Info] v100a frozen production integration is active. Enhanced v100a and Legacy build-102 mutation behavior are frozen; v99d/v98e read-only resolvers are retained for automatic failure diagnostics only.");
+        Logf("[Info] v100b tightened production integration is active. Enhanced Benny patching is limited to the verified C26F00 construction path; Legacy build-102 mutation behavior is unchanged; v99d/v98e read-only resolvers are retained for automatic failure diagnostics only.");
     }
     else
     {
@@ -39303,7 +38203,6 @@ void ScriptMain()
     if (enhanced)
         Logf("[Info] Enhanced safety: retired raw EXECUTE_CONTENT_CHANGESET is disabled because ScriptHookV cannot resolve it on this build.");
 
-    
     WAIT(0);
 
     LogSetup2LoaderProbeState("after first script frame");
@@ -39394,7 +38293,6 @@ void ScriptMain()
         reinterpret_cast<void*>(
             g_v52TriggerCallsite));
 
-
     Logf(
         "[NaturalDescriptorV55] first-frame candidates=%ld alreadyPresent=%ld injected=%ld rejected=%ld writeFaults=%ld restoreAttempts=%ld restoreVerified=%ld restoreFailures=%ld sourceStoryBenny=%ld normalizedMapBenny=%ld storyAtMidFilter=%ld active=%ld lastChild=%p descriptorTable=%p count=%u->%u.",
         static_cast<long>(g_v54DescriptorCandidateHits),
@@ -39425,7 +38323,6 @@ void ScriptMain()
             static_cast<unsigned long>(g_v78C25F4ECallsiteFailureCode),
             GetV78C25F4ECallsiteFailureReason());
     }
-
 
     if (enhanced)
     {
@@ -39458,7 +38355,7 @@ void ScriptMain()
         enhanced,
         loaded,
         enhanced
-            ? "Enhanced v100a frozen startup/mutation validation failed."
+            ? "Enhanced v100b tightened startup/mutation validation failed."
             : "Legacy frozen startup path failed before a retryable/committed state.");
 
     const bool productionSuccess =
@@ -39498,9 +38395,7 @@ void ScriptMain()
         {
             const bool cachedOverlay =
                 IsLegacyV87CachedStockOverlayReusable();
-            
-            
-            
+
             nextLegacyStableRetry =
                 GetTickCount64() + 1000ULL;
             ++g_legacyV87AutomaticRetryCount;
