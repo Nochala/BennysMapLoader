@@ -17,7 +17,7 @@
 static const char* g_iniPath = ".\\BennysMapLoader.ini";
 static const char* g_logPath = "BennysMapLoader.log";
 
-static const char* kBuildTag = "v100b-tightened-benny-only-patching";
+static const char* kBuildTag = "v103 cross-build directional garage door recovery";
 
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
@@ -30,6 +30,7 @@ static SRWLOCK g_productionLogLock = SRWLOCK_INIT;
 static std::string g_startupDebugBuffer;
 static bool g_deepMemoryDiagnostics = false;
 static bool g_showNotification = false;
+static bool g_bennysGarageDoorRecoveryEnabled = true;
 static bool g_experimentalMemoryPatch = false;
 
 static bool g_experimentalInternalGroupAdd = false;
@@ -69,7 +70,7 @@ static volatile LONG g_constructionHookBennyCalls = 0;
 static DWORD g_constructionHookFailureCode = 0;
 
 static bool g_constructionHookAllowRewrite = false;
-static volatile LONG g_v38ConstructionInsertState = 0; 
+static volatile LONG g_v38ConstructionInsertState = 0;
 static volatile LONG g_v38LowriderPostCalls = 0;
 static volatile LONG g_v38ExactBaselineHits = 0;
 static uintptr_t g_v38InsertChild = 0;
@@ -143,7 +144,7 @@ static DWORD g_v46C27740FailureCode = 0;
 static volatile LONG g_v46C27740TotalCalls = 0;
 static volatile LONG g_v46LowriderCalls = 0;
 static volatile LONG g_v46TriggerPairHits = 0;
-static volatile LONG g_v46SyntheticState = 0; 
+static volatile LONG g_v46SyntheticState = 0;
 static volatile LONG g_v46SyntheticCalls = 0;
 
 static uintptr_t g_v46SyntheticChild = 0;
@@ -439,7 +440,7 @@ static uint8_t g_v78C25F4EOriginalCallBytes[5]{};
 
 static constexpr bool g_v79EnhancedLateReplayExperiment = false;
 static volatile LONG g_v79NaturalInjectionSuppressedHits = 0;
-static volatile LONG g_v79LateReplayState = 0; 
+static volatile LONG g_v79LateReplayState = 0;
 static DWORD g_v79LateReplayFailureCode = 0;
 static uintptr_t g_v79LateReplayMapState = 0;
 static uintptr_t g_v79LateReplayChild = 0;
@@ -900,7 +901,7 @@ static uintptr_t g_setup2LoaderTargetRecord = 0;
 static uint32_t g_setup2LoaderTargetGroup = 0;
 static uint32_t g_setup2LoaderTargetFlags = 0;
 static volatile LONG g_setup2LoaderTimingScanAttempts = 0;
-static LONG g_setup2LoaderTargetScanPhase = 0; 
+static LONG g_setup2LoaderTargetScanPhase = 0;
 static uint32_t g_setup2LoaderTimingExactHits = 0;
 static bool g_setup2LoaderTimingRewriteAttempted = false;
 static bool g_setup2LoaderTimingRewriteVerified = false;
@@ -937,6 +938,59 @@ static const char* kMapGroup = "GROUP_MAP";
 static const char* kStoryMapGroup = "GROUP_MAP_SP";
 static const char* kBennysChangeSet = "MPLOWRIDER_GTA5_CITYE_SCENTRAL_01";
 static const char* kBennysPrimaryIpl = "lr_sc1_02_interior_0_supermod_int_milo_";
+
+static constexpr uint32_t kBennysGarageDoorModel = 0xE684E276U;
+static constexpr float kBennysGarageDoorX = -205.6828f;
+static constexpr float kBennysGarageDoorY = -1310.683f;
+static constexpr float kBennysGarageDoorZ = 30.29572f;
+
+static constexpr float kBennysGarageDoorAssistDistance = 15.0f;
+static constexpr float kBennysGarageDoorRetryDistance = 25.0f;
+static constexpr float kBennysGarageDoorModelPreloadDistance = 35.0f;
+static constexpr float kBennysGarageDoorModelReleaseDistance = 45.0f;
+
+static constexpr float kBennysGarageDoorInteriorDirX = -0.40987134f;
+static constexpr float kBennysGarageDoorInteriorDirY = -0.91214335f;
+
+static constexpr float kBennysGarageDoorInsideCloseDepth = 4.0f;
+
+static constexpr float kBennysGarageDoorInsideExitAssistDistance = 18.0f;
+static constexpr float kBennysGarageDoorOutsideResetDepth = -1.5f;
+static constexpr float kBennysGarageDoorDirectionEpsilon = 0.03f;
+static constexpr ULONGLONG kBennysGarageDoorRetryMs = 1000ULL;
+static constexpr ULONGLONG kBennysGarageDoorModelRetryMs = 500ULL;
+static constexpr ULONGLONG kBennysGarageDoorUpdateMs = 50ULL;
+
+static constexpr uint64_t kRequestModelNative =
+    0x963D27A58DF860ACULL;
+static constexpr uint64_t kHasModelLoadedNative =
+    0x98A4EB5D89A0C952ULL;
+static constexpr uint64_t kSetModelAsNoLongerNeededNative =
+    0xE532F5D78798DAABULL;
+static constexpr uint64_t kSetLockedUnstreamedInDoorOfTypeNative =
+    0x9B12F9A24FABEDB0ULL;
+static constexpr uint64_t kDoorSystemFindExistingDoorNative =
+    0x589F80B325CC82C5ULL;
+static constexpr uint64_t kDoorSystemGetIsPhysicsLoadedNative =
+    0xDF97CDD4FC08FD34ULL;
+static constexpr uint64_t kDoorSystemSetDoorStateNative =
+    0x6BAB9442830C7F53ULL;
+static constexpr uint64_t kDoorSystemSetOpenRatioNative =
+    0xB6E6FBA95C7324ACULL;
+static constexpr uint64_t kDoorSystemSetHoldOpenNative =
+    0xD9B71952F78A2640ULL;
+
+static ULONGLONG g_bennysGarageDoorNextAttempt = 0;
+static ULONGLONG g_bennysGarageDoorModelNextRequest = 0;
+static ULONGLONG g_bennysGarageDoorNextUpdate = 0;
+static uint32_t g_bennysGarageDoorSystemHash = 0;
+static bool g_bennysGarageDoorAssistActive = false;
+static bool g_bennysGarageDoorHoldOpen = false;
+static bool g_bennysGarageDoorModelRequested = false;
+static bool g_bennysGarageDoorInsideLatched = false;
+static bool g_bennysGarageDoorInsideExitOpening = false;
+static bool g_bennysGarageDoorDepthSampleValid = false;
+static float g_bennysGarageDoorLastInteriorDepth = 0.0f;
 
 static bool IsEnhancedExecutableImage()
 {
@@ -1477,6 +1531,15 @@ static bool IsEnhancedVersion()
 {
 
     return (getGameVersion() >= 1000);
+}
+
+static bool IsOlderLegacyLowridersBuild()
+{
+    const int gameVersion = getGameVersion();
+
+    return IsLegacyExecutableImage()
+        && gameVersion >= 12
+        && gameVersion < 102;
 }
 
 static const char* GetEditionTag(bool enhanced)
@@ -3553,10 +3616,10 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x85;
         p += 4;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x52; 
+        stubBytes[p++] = 0x52;
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x8B;
-        stubBytes[p++] = 0x17; 
+        stubBytes[p++] = 0x17;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -3564,9 +3627,9 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
                 &g_midFilterLastAssociatedWhenMap));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10; 
+        stubBytes[p++] = 0x10;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x5A; 
+        stubBytes[p++] = 0x5A;
         PatchRel32(stubBytes, jneMapCapture, 6, p);
 
         stubBytes[p++] = 0x41;
@@ -3580,10 +3643,10 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x85;
         p += 4;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x52; 
+        stubBytes[p++] = 0x52;
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x8B;
-        stubBytes[p++] = 0x17; 
+        stubBytes[p++] = 0x17;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -3591,9 +3654,9 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
                 &g_midFilterLastAssociatedWhenStory));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10; 
+        stubBytes[p++] = 0x10;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x5A; 
+        stubBytes[p++] = 0x5A;
         PatchRel32(stubBytes, jneStoryCapture, 6, p);
 
         stubBytes[p++] = 0x41;
@@ -3606,11 +3669,11 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x85;
         p += 4;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x52; 
+        stubBytes[p++] = 0x52;
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x8B;
         stubBytes[p++] = 0x14;
-        stubBytes[p++] = 0x24; 
+        stubBytes[p++] = 0x24;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -3618,9 +3681,9 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
                 &g_midFilterLastGroupWhenBenny));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10; 
+        stubBytes[p++] = 0x10;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x5A; 
+        stubBytes[p++] = 0x5A;
         PatchRel32(stubBytes, jneBennyCapture, 6, p);
 
         stubBytes[p++] = 0x41;
@@ -3674,12 +3737,12 @@ static void InstallC27931MidFilterProbeAtModuleLoad()
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x8B;
         stubBytes[p++] = 0x04;
-        stubBytes[p++] = 0x24; 
+        stubBytes[p++] = 0x24;
         stubBytes[p++] = 0x3D;
         stubBytes[p++] = 0xE2;
         stubBytes[p++] = 0x99;
         stubBytes[p++] = 0x8F;
-        stubBytes[p++] = 0x57; 
+        stubBytes[p++] = 0x57;
 
         const size_t returnJumpStart = p;
         stubBytes[p++] = 0xE9;
@@ -4868,11 +4931,11 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         bytes[p++]=0xF0; bytes[p++]=0xFF; bytes[p++]=0x00;
 
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(&g_v49OverlayLastOriginalGroup));
-        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0F; 
-        bytes[p++]=0x89; bytes[p++]=0x08; 
+        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0F;
+        bytes[p++]=0x89; bytes[p++]=0x08;
 
         EmitMovRaxImm64(bytes,p,reinterpret_cast<uint64_t>(&g_v49OverlayLastKey));
-        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0C; bytes[p++]=0x24; 
+        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x0C; bytes[p++]=0x24;
         bytes[p++]=0x89; bytes[p++]=0x08;
 
         bytes[p++]=0x41; bytes[p++]=0xC7; bytes[p++]=0x07;
@@ -4885,7 +4948,7 @@ static void InstallV49OverlayClassificationHookAtModuleLoad()
         PatchRel32(bytes,jneGroup,6,classify);
         PatchRel32(bytes,jneBenny,6,classify);
 
-        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x07; 
+        bytes[p++]=0x41; bytes[p++]=0x8B; bytes[p++]=0x07;
         bytes[p++]=0x3D; memcpy(bytes+p,&groupMapSp,sizeof(groupMapSp)); p+=sizeof(groupMapSp);
         const size_t jeAccept=p; bytes[p++]=0x0F; bytes[p++]=0x84; p+=4;
         bytes[p++]=0x3D; memcpy(bytes+p,&groupMap,sizeof(groupMap)); p+=sizeof(groupMap);
@@ -5454,7 +5517,7 @@ static void InstallV47Setup2MembershipBypassAtModuleLoad()
                 &g_v47MembershipBypassHits));
         bytes[p++] = 0xF0;
         bytes[p++] = 0xFF;
-        bytes[p++] = 0x00; 
+        bytes[p++] = 0x00;
 
         EmitMovRaxImm64(
             bytes,
@@ -8052,83 +8115,83 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
 
         bool emitted = true;
 
-        emitted = emitted && V78_EMIT8(0x9C);             
-        emitted = emitted && V78_EMIT8(0x50);             
-        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x52); 
-        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x53); 
+        emitted = emitted && V78_EMIT8(0x9C);
+        emitted = emitted && V78_EMIT8(0x50);
+        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x52);
+        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x53);
 
         emitted = emitted && V78_EMIT8(0x49) && V78_EMIT8(0xBB)
             && V78_EMIT64(reinterpret_cast<uint64_t>(
-                &g_v78C25F4ECallsiteTotalCalls));          
+                &g_v78C25F4ECallsiteTotalCalls));
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0xBA)
-            && V78_EMIT32(1);                               
+            && V78_EMIT32(1);
         emitted = emitted && V78_EMIT8(0xF0) && V78_EMIT8(0x45)
-            && V78_EMIT8(0x0F) && V78_EMIT8(0xC1) && V78_EMIT8(0x13); 
+            && V78_EMIT8(0x0F) && V78_EMIT8(0xC1) && V78_EMIT8(0x13);
         emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x81)
             && V78_EMIT8(0xFA)
             && V78_EMIT32(static_cast<uint32_t>(
-                kV78C25F4EMaxSnapshots));               
+                kV78C25F4EMaxSnapshots));
 
-        emitted = emitted && V78_EMIT8(0x0F) && V78_EMIT8(0x83); 
+        emitted = emitted && V78_EMIT8(0x0F) && V78_EMIT8(0x83);
         const size_t skipRel32Offset = pos;
         emitted = emitted && V78_EMIT32(0);
 
         emitted = emitted && V78_EMIT8(0x4D) && V78_EMIT8(0x69)
             && V78_EMIT8(0xD2)
             && V78_EMIT32(static_cast<uint32_t>(
-                sizeof(V78C25F4ECallsiteSnapshot)));       
+                sizeof(V78C25F4ECallsiteSnapshot)));
         emitted = emitted && V78_EMIT8(0x49) && V78_EMIT8(0xBB)
             && V78_EMIT64(reinterpret_cast<uint64_t>(
-                g_v78C25F4ECallsiteSnapshots));             
+                g_v78C25F4ECallsiteSnapshots));
         emitted = emitted && V78_EMIT8(0x4D) && V78_EMIT8(0x01)
-            && V78_EMIT8(0xD3);                             
+            && V78_EMIT8(0xD3);
 
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0x8B, 0x00); 
+            bridge, bridgeCapacity, pos, 0x49, 0x8B, 0x00);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0x93, 0x08); 
+            bridge, bridgeCapacity, pos, 0x49, 0x93, 0x08);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x83, 0x10); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x83, 0x10);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x8B, 0x18); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x8B, 0x18);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0x9B, 0x28); 
+            bridge, bridgeCapacity, pos, 0x49, 0x9B, 0x28);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0xAB, 0x30); 
+            bridge, bridgeCapacity, pos, 0x49, 0xAB, 0x30);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0xB3, 0x38); 
+            bridge, bridgeCapacity, pos, 0x49, 0xB3, 0x38);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x49, 0xBB, 0x40); 
+            bridge, bridgeCapacity, pos, 0x49, 0xBB, 0x40);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0xA3, 0x58); 
+            bridge, bridgeCapacity, pos, 0x4D, 0xA3, 0x58);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0xAB, 0x60); 
+            bridge, bridgeCapacity, pos, 0x4D, 0xAB, 0x60);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0xB3, 0x68); 
+            bridge, bridgeCapacity, pos, 0x4D, 0xB3, 0x68);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0xBB, 0x70); 
+            bridge, bridgeCapacity, pos, 0x4D, 0xBB, 0x70);
 
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8B)
-            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x10); 
+            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x10);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x20); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x20);
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8B)
-            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x08); 
+            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x08);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x48); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x48);
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8B)
-            && V78_EMIT8(0x14) && V78_EMIT8(0x24);                 
+            && V78_EMIT8(0x14) && V78_EMIT8(0x24);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x50); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x50);
 
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8D)
-            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x20); 
+            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x20);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x78); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x78);
         emitted = emitted && V78_EMIT8(0x4C) && V78_EMIT8(0x8B)
-            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x20); 
+            && V78_EMIT8(0x54) && V78_EMIT8(0x24) && V78_EMIT8(0x20);
         emitted = emitted && EmitV78StoreRegToR11Disp32(
-            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x80); 
+            bridge, bridgeCapacity, pos, 0x4D, 0x93, 0x80);
 
         for (uint32_t i = 0; emitted && i < 8; ++i)
         {
@@ -8171,10 +8234,10 @@ static void InstallV78C25F4ECallsiteProbeAtModuleLoad()
             emitted = false;
         }
 
-        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5B); 
-        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5A); 
-        emitted = emitted && V78_EMIT8(0x58);                
-        emitted = emitted && V78_EMIT8(0x9D);                
+        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5B);
+        emitted = emitted && V78_EMIT8(0x41) && V78_EMIT8(0x5A);
+        emitted = emitted && V78_EMIT8(0x58);
+        emitted = emitted && V78_EMIT8(0x9D);
 
         emitted = emitted && V78_EMIT8(0xFF) && V78_EMIT8(0x25)
             && V78_EMIT32(0)
@@ -9100,9 +9163,9 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         const uint32_t benny = 0x4CDFC843U;
         const uint32_t dlc = 0x61322A35U;
 
-        stubBytes[p++] = 0x50;             
+        stubBytes[p++] = 0x50;
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x52;             
+        stubBytes[p++] = 0x52;
 
         emitCounterIncrement(&g_preDiscardPairTotalHits);
         emitEbxCompareAndCount(
@@ -9128,7 +9191,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         p += 4;
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0xC2;             
+        stubBytes[p++] = 0xC2;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -9136,7 +9199,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
                 &g_preDiscardPairLastAssociatedWhenMap));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10;             
+        stubBytes[p++] = 0x10;
         PatchRel32(stubBytes, jneMapCapture, 6, p);
 
         stubBytes[p++] = 0x81;
@@ -9149,7 +9212,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         p += 4;
         stubBytes[p++] = 0x45;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0xC2;             
+        stubBytes[p++] = 0xC2;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -9157,7 +9220,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
                 &g_preDiscardPairLastAssociatedWhenStory));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10;             
+        stubBytes[p++] = 0x10;
         PatchRel32(stubBytes, jneStoryCapture, 6, p);
 
         stubBytes[p++] = 0x41;
@@ -9171,7 +9234,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         p += 4;
         stubBytes[p++] = 0x41;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0xDA;             
+        stubBytes[p++] = 0xDA;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -9179,10 +9242,10 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
                 &g_preDiscardPairLastGroupWhenBenny));
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10;             
+        stubBytes[p++] = 0x10;
         stubBytes[p++] = 0x4D;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0xE2;             
+        stubBytes[p++] = 0xE2;
         EmitMovRaxImm64(
             stubBytes,
             p,
@@ -9190,7 +9253,7 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
                 &g_preDiscardPairLastGroupPointerWhenBenny));
         stubBytes[p++] = 0x4C;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10;             
+        stubBytes[p++] = 0x10;
         PatchRel32(stubBytes, jneBennyCapture, 6, p);
 
         stubBytes[p++] = 0x81;
@@ -9236,8 +9299,8 @@ static void InstallC27E80PreDiscardPairProbeAtModuleLoad()
         PatchRel32(stubBytes, jneExactStoryGroup, 6, p);
 
         stubBytes[p++] = 0x41;
-        stubBytes[p++] = 0x5A;             
-        stubBytes[p++] = 0x58;             
+        stubBytes[p++] = 0x5A;
+        stubBytes[p++] = 0x58;
 
         stubBytes[p++] = 0x81;
         stubBytes[p++] = 0xFB;
@@ -9675,7 +9738,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             reinterpret_cast<uint64_t>(&g_preFilterLastContext));
         stubBytes[p++] = 0x48;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x08; 
+        stubBytes[p++] = 0x08;
 
         EmitMovRaxImm64(
             stubBytes,
@@ -9683,7 +9746,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             reinterpret_cast<uint64_t>(&g_preFilterLastGroupPtr));
         stubBytes[p++] = 0x48;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x10; 
+        stubBytes[p++] = 0x10;
 
         EmitMovRaxImm64(
             stubBytes,
@@ -9691,7 +9754,7 @@ static void InstallC27740PreFilterHookAtModuleLoad()
             reinterpret_cast<uint64_t>(&g_preFilterLastAssociatedPtr));
         stubBytes[p++] = 0x4C;
         stubBytes[p++] = 0x89;
-        stubBytes[p++] = 0x00; 
+        stubBytes[p++] = 0x00;
 
         stubBytes[p++] = 0x44;
         stubBytes[p++] = 0x8B;
@@ -10071,8 +10134,8 @@ static bool g_legacyNaturalSignatureUnique = false;
 static bool g_legacyNaturalTargetPrefixVerified = false;
 static DWORD g_legacyNaturalFailureCode = 0;
 static uintptr_t g_legacyNaturalSignatureAddress = 0;
-static uintptr_t g_legacyNaturalCallsite = 0; 
-static uintptr_t g_legacyNaturalTarget = 0;   
+static uintptr_t g_legacyNaturalCallsite = 0;
+static uintptr_t g_legacyNaturalTarget = 0;
 static uintptr_t g_legacyV57WorkerTarget = 0;
 static uintptr_t g_legacyV58WrapperAddress = 0;
 static uintptr_t g_legacyV58StoryCallsite = 0;
@@ -28950,6 +29013,453 @@ static bool IsBennysMapAvailable(const BennysMapState& state)
     return state.primaryIplActive || state.validInterior;
 }
 
+static bool IsBennysMapReadyForOlderLegacy(const BennysMapState& state)
+{
+
+    return state.primaryIplActive
+        || (state.validInterior && state.readyInterior);
+}
+
+static uint64_t PackNativeFloat(float value)
+{
+    uint32_t bits = 0;
+    memcpy(&bits, &value, sizeof(bits));
+    return static_cast<uint64_t>(bits);
+}
+
+static void RequestBennysGarageDoorModel()
+{
+    nativeInit(kRequestModelNative);
+    nativePush64(static_cast<uint64_t>(kBennysGarageDoorModel));
+    nativeCall();
+    g_bennysGarageDoorModelRequested = true;
+}
+
+static bool IsBennysGarageDoorModelLoaded()
+{
+    nativeInit(kHasModelLoadedNative);
+    nativePush64(static_cast<uint64_t>(kBennysGarageDoorModel));
+
+    uint64_t* result = nativeCall();
+    return result && result[0] != 0;
+}
+
+static void ReleaseBennysGarageDoorModel()
+{
+    if (!g_bennysGarageDoorModelRequested)
+        return;
+
+    nativeInit(kSetModelAsNoLongerNeededNative);
+    nativePush64(static_cast<uint64_t>(kBennysGarageDoorModel));
+    nativeCall();
+
+    g_bennysGarageDoorModelRequested = false;
+    g_bennysGarageDoorModelNextRequest = 0;
+}
+
+static void SetBennysGarageDoorUnstreamedLocked(bool locked)
+{
+    nativeInit(kSetLockedUnstreamedInDoorOfTypeNative);
+    nativePush64(static_cast<uint64_t>(kBennysGarageDoorModel));
+    nativePush64(PackNativeFloat(kBennysGarageDoorX));
+    nativePush64(PackNativeFloat(kBennysGarageDoorY));
+    nativePush64(PackNativeFloat(kBennysGarageDoorZ));
+    nativePush64(locked ? 1ULL : 0ULL);
+    nativePush64(PackNativeFloat(0.0f));
+    nativePush64(PackNativeFloat(50.0f));
+    nativePush64(PackNativeFloat(0.0f));
+    nativeCall();
+}
+
+static void SetBennysGarageDoorUnstreamedOpen()
+{
+    SetBennysGarageDoorUnstreamedLocked(false);
+}
+
+static void SetBennysGarageDoorUnstreamedClosed()
+{
+    SetBennysGarageDoorUnstreamedLocked(true);
+}
+
+static bool FindBennysGarageDoor(uint32_t& doorHash)
+{
+    doorHash = 0;
+
+    nativeInit(kDoorSystemFindExistingDoorNative);
+    nativePush64(PackNativeFloat(kBennysGarageDoorX));
+    nativePush64(PackNativeFloat(kBennysGarageDoorY));
+    nativePush64(PackNativeFloat(kBennysGarageDoorZ));
+    nativePush64(static_cast<uint64_t>(kBennysGarageDoorModel));
+    nativePush64(
+        reinterpret_cast<uint64_t>(
+            &doorHash));
+
+    uint64_t* result = nativeCall();
+    return result
+        && result[0] != 0
+        && doorHash != 0;
+}
+
+static bool IsBennysGarageDoorPhysicsLoaded(uint32_t doorHash)
+{
+    if (doorHash == 0)
+        return false;
+
+    nativeInit(kDoorSystemGetIsPhysicsLoadedNative);
+    nativePush64(static_cast<uint64_t>(doorHash));
+
+    uint64_t* result = nativeCall();
+    return result && result[0] != 0;
+}
+
+static void SetBennysGarageDoorState(
+    uint32_t doorHash,
+    int state)
+{
+    if (doorHash == 0)
+        return;
+
+    nativeInit(kDoorSystemSetDoorStateNative);
+    nativePush64(static_cast<uint64_t>(doorHash));
+    nativePush64(static_cast<uint64_t>(state));
+    nativePush64(0ULL);
+    nativePush64(1ULL);
+    nativeCall();
+}
+
+static void SetBennysGarageDoorOpenRatio(
+    uint32_t doorHash,
+    float ratio)
+{
+    if (doorHash == 0)
+        return;
+
+    nativeInit(kDoorSystemSetOpenRatioNative);
+    nativePush64(static_cast<uint64_t>(doorHash));
+    nativePush64(PackNativeFloat(ratio));
+    nativePush64(0ULL);
+    nativePush64(1ULL);
+    nativeCall();
+}
+
+static void SetBennysGarageDoorHoldOpen(
+    uint32_t doorHash,
+    bool holdOpen)
+{
+    if (doorHash == 0)
+        return;
+
+    nativeInit(kDoorSystemSetHoldOpenNative);
+    nativePush64(static_cast<uint64_t>(doorHash));
+    nativePush64(holdOpen ? 1ULL : 0ULL);
+    nativeCall();
+}
+
+static bool GetBennysGarageDoorPlayerGeometry(
+    float& distanceSquared,
+    float& interiorDepth)
+{
+    distanceSquared = 0.0f;
+    interiorDepth = 0.0f;
+
+    const Ped playerPed = PLAYER::PLAYER_PED_ID();
+    if (playerPed == 0)
+        return false;
+
+    const Vector3 playerPosition =
+        ENTITY::GET_ENTITY_COORDS(
+            playerPed,
+            TRUE);
+
+    const float dx =
+        playerPosition.x - kBennysGarageDoorX;
+    const float dy =
+        playerPosition.y - kBennysGarageDoorY;
+    const float dz =
+        playerPosition.z - kBennysGarageDoorZ;
+
+    distanceSquared =
+        (dx * dx)
+        + (dy * dy)
+        + (dz * dz);
+
+    interiorDepth =
+        (dx * kBennysGarageDoorInteriorDirX)
+        + (dy * kBennysGarageDoorInteriorDirY);
+
+    return true;
+}
+
+static bool IsPlayerWithinBennysGarageDoorDistance(
+    float distance)
+{
+    float distanceSquared = 0.0f;
+    float interiorDepth = 0.0f;
+    if (!GetBennysGarageDoorPlayerGeometry(
+            distanceSquared,
+            interiorDepth))
+    {
+        return false;
+    }
+
+    return distanceSquared <= (distance * distance);
+}
+
+static void ReleaseBennysGarageDoorRecovery()
+{
+    if (g_bennysGarageDoorSystemHash != 0)
+    {
+        if (g_bennysGarageDoorHoldOpen)
+        {
+            SetBennysGarageDoorHoldOpen(
+                g_bennysGarageDoorSystemHash,
+                false);
+        }
+
+        SetBennysGarageDoorState(
+            g_bennysGarageDoorSystemHash,
+            1);
+    }
+
+    SetBennysGarageDoorUnstreamedClosed();
+
+    g_bennysGarageDoorSystemHash = 0;
+    g_bennysGarageDoorAssistActive = false;
+    g_bennysGarageDoorHoldOpen = false;
+    g_bennysGarageDoorNextAttempt = 0;
+}
+
+static void MaintainBennysGarageDoorOpenRecovery(
+    ULONGLONG now)
+{
+    if (!g_bennysGarageDoorAssistActive)
+    {
+        g_bennysGarageDoorAssistActive = true;
+        g_bennysGarageDoorNextAttempt = 0;
+    }
+
+    if (now < g_bennysGarageDoorNextAttempt)
+        return;
+
+    g_bennysGarageDoorNextAttempt =
+        now + kBennysGarageDoorRetryMs;
+
+    SetBennysGarageDoorUnstreamedOpen();
+
+    uint32_t doorHash = 0;
+    if (!FindBennysGarageDoor(doorHash))
+        return;
+
+    g_bennysGarageDoorSystemHash = doorHash;
+
+    if (!IsBennysGarageDoorPhysicsLoaded(doorHash))
+        return;
+
+    SetBennysGarageDoorState(
+        doorHash,
+        0);
+    SetBennysGarageDoorOpenRatio(
+        doorHash,
+        1.0f);
+    SetBennysGarageDoorHoldOpen(
+        doorHash,
+        true);
+    g_bennysGarageDoorHoldOpen = true;
+}
+
+static void MaintainBennysGarageDoorClosedRecovery(
+    ULONGLONG now)
+{
+    if (now < g_bennysGarageDoorNextAttempt)
+        return;
+
+    g_bennysGarageDoorNextAttempt =
+        now + kBennysGarageDoorRetryMs;
+
+    SetBennysGarageDoorUnstreamedClosed();
+
+    uint32_t doorHash = g_bennysGarageDoorSystemHash;
+    if (doorHash == 0
+        && !FindBennysGarageDoor(doorHash))
+    {
+        return;
+    }
+
+    g_bennysGarageDoorSystemHash = doorHash;
+
+    if (!IsBennysGarageDoorPhysicsLoaded(doorHash))
+        return;
+
+    if (g_bennysGarageDoorHoldOpen)
+    {
+        SetBennysGarageDoorHoldOpen(
+            doorHash,
+            false);
+        g_bennysGarageDoorHoldOpen = false;
+    }
+
+    SetBennysGarageDoorOpenRatio(
+        doorHash,
+        0.0f);
+    SetBennysGarageDoorState(
+        doorHash,
+        1);
+}
+
+static void MaintainBennysGarageDoorRecovery(
+    ULONGLONG now)
+{
+    if (now < g_bennysGarageDoorNextUpdate)
+        return;
+
+    g_bennysGarageDoorNextUpdate =
+        now + kBennysGarageDoorUpdateMs;
+
+    if (!g_bennysGarageDoorRecoveryEnabled)
+    {
+        if (g_bennysGarageDoorAssistActive
+            || g_bennysGarageDoorInsideLatched)
+        {
+            ReleaseBennysGarageDoorRecovery();
+        }
+
+        ReleaseBennysGarageDoorModel();
+        g_bennysGarageDoorInsideLatched = false;
+        g_bennysGarageDoorInsideExitOpening = false;
+        g_bennysGarageDoorDepthSampleValid = false;
+        return;
+    }
+
+    float distanceSquared = 0.0f;
+    float interiorDepth = 0.0f;
+    if (!GetBennysGarageDoorPlayerGeometry(
+            distanceSquared,
+            interiorDepth))
+    {
+        return;
+    }
+
+    const bool withinModelPreloadDistance =
+        distanceSquared
+        <= (kBennysGarageDoorModelPreloadDistance
+            * kBennysGarageDoorModelPreloadDistance);
+
+    if (withinModelPreloadDistance)
+    {
+        if (now >= g_bennysGarageDoorModelNextRequest)
+        {
+            if (!g_bennysGarageDoorModelRequested
+                || !IsBennysGarageDoorModelLoaded())
+            {
+                RequestBennysGarageDoorModel();
+            }
+
+            g_bennysGarageDoorModelNextRequest =
+                now + kBennysGarageDoorModelRetryMs;
+        }
+    }
+    else if (distanceSquared
+        > (kBennysGarageDoorModelReleaseDistance
+            * kBennysGarageDoorModelReleaseDistance))
+    {
+        ReleaseBennysGarageDoorModel();
+    }
+
+    const bool movingTowardOutside =
+        g_bennysGarageDoorDepthSampleValid
+        && interiorDepth
+            < (g_bennysGarageDoorLastInteriorDepth
+                - kBennysGarageDoorDirectionEpsilon);
+
+    const bool movingDeeperInside =
+        g_bennysGarageDoorDepthSampleValid
+        && interiorDepth
+            > (g_bennysGarageDoorLastInteriorDepth
+                + kBennysGarageDoorDirectionEpsilon);
+
+    g_bennysGarageDoorLastInteriorDepth =
+        interiorDepth;
+    g_bennysGarageDoorDepthSampleValid = true;
+
+    const bool withinDoorRetryDistance =
+        distanceSquared
+        <= (kBennysGarageDoorRetryDistance
+            * kBennysGarageDoorRetryDistance);
+
+    const bool withinOutsideAssistDistance =
+        distanceSquared
+        <= (kBennysGarageDoorAssistDistance
+            * kBennysGarageDoorAssistDistance);
+
+    const bool withinInsideExitAssistDistance =
+        distanceSquared
+        <= (kBennysGarageDoorInsideExitAssistDistance
+            * kBennysGarageDoorInsideExitAssistDistance);
+
+    if (!g_bennysGarageDoorInsideLatched
+        && interiorDepth >= kBennysGarageDoorInsideCloseDepth)
+    {
+        g_bennysGarageDoorInsideLatched = true;
+        g_bennysGarageDoorInsideExitOpening = false;
+
+        g_bennysGarageDoorNextAttempt = 0;
+        if (g_bennysGarageDoorAssistActive)
+            ReleaseBennysGarageDoorRecovery();
+
+        MaintainBennysGarageDoorClosedRecovery(now);
+        return;
+    }
+
+    if (g_bennysGarageDoorInsideLatched)
+    {
+        if (!withinDoorRetryDistance)
+            return;
+
+        if (interiorDepth <= kBennysGarageDoorOutsideResetDepth)
+        {
+            g_bennysGarageDoorInsideLatched = false;
+            g_bennysGarageDoorInsideExitOpening = false;
+            g_bennysGarageDoorNextAttempt = 0;
+        }
+        else
+        {
+
+            if (!g_bennysGarageDoorInsideExitOpening
+                && movingTowardOutside
+                && withinInsideExitAssistDistance)
+            {
+                g_bennysGarageDoorInsideExitOpening = true;
+                g_bennysGarageDoorNextAttempt = 0;
+            }
+
+            if (g_bennysGarageDoorInsideExitOpening
+                && movingDeeperInside
+                && interiorDepth
+                    >= kBennysGarageDoorInsideCloseDepth)
+            {
+                g_bennysGarageDoorInsideExitOpening = false;
+                g_bennysGarageDoorNextAttempt = 0;
+            }
+
+            if (g_bennysGarageDoorInsideExitOpening)
+                MaintainBennysGarageDoorOpenRecovery(now);
+            else
+                MaintainBennysGarageDoorClosedRecovery(now);
+
+            return;
+        }
+    }
+
+    if (withinOutsideAssistDistance)
+    {
+        MaintainBennysGarageDoorOpenRecovery(now);
+    }
+    else if (g_bennysGarageDoorAssistActive)
+    {
+        ReleaseBennysGarageDoorRecovery();
+    }
+}
+
 static void ActivateBennysInterior(const BennysMapState& state)
 {
     if (!state.validInterior || state.selectedInteriorId == 0)
@@ -29504,6 +30014,58 @@ static void ExecuteBennysContentChangesetRaw()
     nativePush64(static_cast<uint64_t>(groupHash));
     nativePush64(static_cast<uint64_t>(changeSetHash));
     nativeCall();
+}
+
+static bool TryLoadBennysMapOlderLegacyIplFallback(bool manualRetry)
+{
+    if (!IsOlderLegacyLowridersBuild())
+        return false;
+
+    BennysMapState state = CaptureBennysMapState();
+    if (IsBennysMapReadyForOlderLegacy(state))
+    {
+        ActivateBennysInterior(state);
+        LogBennysMapState(
+            "[OldLegacyFallback] Benny's was already fully streamed/ready.",
+            state);
+        return true;
+    }
+
+    Logf(
+        "[OldLegacyFallback] %srequest for GTA Legacy gameVersion=%d. The frozen build-102 memory path is bypassed; requesting only Benny's Lowriders IPL set once.",
+        manualRetry ? "Manual " : "Initial ",
+        getGameVersion());
+
+    for (size_t i = 0;
+         i < sizeof(kBennysLowriderIpls) / sizeof(kBennysLowriderIpls[0]);
+         ++i)
+    {
+        STREAMING::REQUEST_IPL((char*)kBennysLowriderIpls[i]);
+    }
+
+    const ULONGLONG deadline = GetTickCount64() + 5000ULL;
+    while (GetTickCount64() < deadline)
+    {
+        WAIT(100);
+        state = CaptureBennysMapState();
+
+        if (!IsBennysMapReadyForOlderLegacy(state))
+            continue;
+
+        ActivateBennysInterior(state);
+        WAIT(0);
+        state = CaptureBennysMapState();
+        LogBennysMapState(
+            "[OldLegacyFallback] SUCCESS: targeted Benny's IPL set is streamed and the workshop interior was activated.",
+            state);
+        return true;
+    }
+
+    state = CaptureBennysMapState();
+    LogBennysMapState(
+        "[OldLegacyFallback] Targeted IPLs were requested once, but Benny's is not fully ready yet; passive probing will continue without re-requesting every frame.",
+        state);
+    return false;
 }
 
 static bool TryMutateBennyStoryGroupEntryViaRockstar1012(bool add)
@@ -37653,7 +38215,12 @@ static bool RunLegacyV73ConstructionPairReplay()
 static bool TryLoadBennysMap(bool manualRetry)
 {
     BennysMapState state = CaptureBennysMapState();
-    if (IsBennysMapAvailable(state))
+    const bool olderLegacyFallback = IsOlderLegacyLowridersBuild();
+    const bool alreadyAvailable = olderLegacyFallback
+        ? IsBennysMapReadyForOlderLegacy(state)
+        : IsBennysMapAvailable(state);
+
+    if (alreadyAvailable)
     {
 
         if (IsLegacyExecutableImage()
@@ -37823,6 +38390,9 @@ static bool TryLoadBennysMap(bool manualRetry)
 
         return false;
     }
+
+    if (olderLegacyFallback)
+        return TryLoadBennysMapOlderLegacyIplFallback(manualRetry);
 
     if (!manualRetry)
         g_legacyV87RetrySafe = false;
@@ -38139,6 +38709,13 @@ void ScriptMain()
             "ShowNotification",
             1) != 0);
 
+    g_bennysGarageDoorRecoveryEnabled =
+        (ReadIniInt(
+            g_iniPath,
+            "Settings",
+            "GarageDoorRecovery",
+            1) != 0);
+
     g_experimentalMemoryPatch = false;
     g_experimentalInternalGroupAdd = false;
     g_experimentalMapStateReprocess = false;
@@ -38183,7 +38760,8 @@ void ScriptMain()
     LogC2A390ExtractorProbeState("startup (disabled in v55)");
     Logf("[Info] Detected edition: %s", GetEditionTag(enhanced));
     Logf("[Info] getGameVersion()=%d", gameVersion);
-    Logf("[Info] Logging=%s diagnostics=%s deepMemoryDiagnostics=%s experimentalMemoryPatch=%s experimentalInternalGroupAdd=%s experimentalMapStateReprocess=%s experimentalOverlayDescriptorRewrite=%s", g_logEnabled ? "on" : "off", g_diagnosticsEnabled ? "on" : "off", g_deepMemoryDiagnostics ? "on" : "off", g_experimentalMemoryPatch ? "on" : "off", g_experimentalInternalGroupAdd ? "on" : "off", g_experimentalMapStateReprocess ? "on" : "off", g_experimentalOverlayDescriptorRewrite ? "on" : "off");
+    Logf("[Info] Logging=%s diagnostics=%s deepMemoryDiagnostics=%s garageDoorRecovery=%s experimentalMemoryPatch=%s experimentalInternalGroupAdd=%s experimentalMapStateReprocess=%s experimentalOverlayDescriptorRewrite=%s", g_logEnabled ? "on" : "off", g_diagnosticsEnabled ? "on" : "off", g_deepMemoryDiagnostics ? "on" : "off", g_bennysGarageDoorRecoveryEnabled ? "on" : "off", g_experimentalMemoryPatch ? "on" : "off", g_experimentalInternalGroupAdd ? "on" : "off", g_experimentalMapStateReprocess ? "on" : "off", g_experimentalOverlayDescriptorRewrite ? "on" : "off");
+    Logf("[Info] Cross-build garage-door recovery is %s. It preloads the stock shutter model, keeps the original 15 m exterior approach trigger, closes after the player crosses into the workshop, and reopens only when approaching the shutter from inside; it is not tied to a GTA build number.", g_bennysGarageDoorRecoveryEnabled ? "enabled" : "disabled");
     if (enhanced)
     {
         Logf("[Info] v100b tightened production integration is active. Enhanced Benny patching is limited to the verified C26F00 construction path; Legacy build-102 mutation behavior is unchanged; v99d/v98e read-only resolvers are retained for automatic failure diagnostics only.");
@@ -38198,7 +38776,14 @@ void ScriptMain()
     Logf("[Info] Registered group: %s -> 0x%08X", kMapGroup, Joaat(kMapGroup));
     Logf("[Info] Story map group:  %s -> 0x%08X", kStoryMapGroup, Joaat(kStoryMapGroup));
     Logf("[Info] Target changeset: %s -> 0x%08X", kBennysChangeSet, Joaat(kBennysChangeSet));
-    Logf("[Info] This build intentionally does not call REQUEST_IPL, ON_ENTER_MP, ON_ENTER_SP, or EXECUTE_CONTENT_CHANGESET_GROUP_FOR_ALL(GROUP_MAP).");
+    if (!enhanced && IsOlderLegacyLowridersBuild())
+    {
+        Logf("[Info] Older Legacy compatibility is active: Benny's seven known Lowriders IPLs may be requested once as a targeted fallback. Whole GROUP_MAP, ON_ENTER_MP, and ON_ENTER_SP remain disabled.");
+    }
+    else
+    {
+        Logf("[Info] This build intentionally does not call REQUEST_IPL, ON_ENTER_MP, ON_ENTER_SP, or EXECUTE_CONTENT_CHANGESET_GROUP_FOR_ALL(GROUP_MAP).");
+    }
     DumpBuild1012OwnerGateState();
     if (enhanced)
         Logf("[Info] Enhanced safety: retired raw EXECUTE_CONTENT_CHANGESET is disabled because ScriptHookV cannot resolve it on this build.");
@@ -38387,6 +38972,9 @@ void ScriptMain()
     {
         WAIT(0);
 
+        MaintainBennysGarageDoorRecovery(
+            GetTickCount64());
+
         if (!enhanced
             && !loaded
             && g_legacyV87RetrySafe
@@ -38423,7 +39011,11 @@ void ScriptMain()
         {
             nextPassiveProbe = GetTickCount64() + 1000ULL;
             BennysMapState state = CaptureBennysMapState();
-            if (IsBennysMapAvailable(state))
+            const bool passiveReady = IsOlderLegacyLowridersBuild()
+                ? IsBennysMapReadyForOlderLegacy(state)
+                : IsBennysMapAvailable(state);
+
+            if (passiveReady)
             {
                 loaded = true;
                 ActivateBennysInterior(state);
