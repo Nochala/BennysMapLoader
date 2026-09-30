@@ -17,7 +17,7 @@
 static const char* g_iniPath = ".\\BennysMapLoader.ini";
 static const char* g_logPath = "BennysMapLoader.log";
 
-static const char* kBuildTag = "v103 cross-build directional garage door recovery";
+static const char* kBuildTag = "v104 universal Legacy runtime loader + directional garage door recovery";
 
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
@@ -11405,6 +11405,7 @@ struct LegacyV61DescriptorState
 };
 
 static LegacyV61DescriptorState g_legacyV61{};
+static bool g_legacyV61AllowUniversalOlderBuild = false;
 static uint8_t g_legacyV61DescriptorScratch[65 * 0x18]{};
 static uint32_t g_legacyV61MapAssociatedScratch[512]{};
 static uint32_t g_legacyV61StoryAssociatedScratch[1] = { 0x4CDFC843U };
@@ -11655,7 +11656,8 @@ static bool RestoreLegacyV61DescriptorView()
 static bool ApplyLegacyV61DescriptorView(uintptr_t expectedChild = 0)
 {
     if (!IsLegacyExecutableImage()
-        || getGameVersion() != 102)
+        || (getGameVersion() != 102
+            && !g_legacyV61AllowUniversalOlderBuild))
     {
         return false;
     }
@@ -32554,6 +32556,9 @@ struct LegacyV98UniversalResolverState
 };
 
 static LegacyV98UniversalResolverState g_legacyV98{};
+static bool g_legacyV98OlderMutationAttempted = false;
+static bool g_legacyV98OlderMutationCommitted = false;
+static bool g_legacyV98OlderMutationFaulted = false;
 
 static bool DecodeLegacyV98MemoryDisplacement(
     const uint8_t* instruction,
@@ -38212,6 +38217,449 @@ static bool RunLegacyV73ConstructionPairReplay()
     return stableSuccess;
 }
 
+
+static bool IsLegacyV98OlderMutationLayoutSafe()
+{
+    return IsOlderLegacyLowridersBuild()
+        && g_legacyV98.readyForMutationResearch
+        && !g_legacyV98.faulted
+        && g_legacyV98.contextCandidates == 1
+        && g_legacyV98.descriptorCandidates == 1
+        && g_legacyV98.derivedCandidates == 1
+        && g_legacyV98.overlayCandidates == 1
+        && g_legacyV98.constructionCandidates == 1
+        && g_legacyV98.childArrayOffset == 0x28U
+        && g_legacyV98.childCountOffset == 0x30U
+        && g_legacyV98.childStride == 0xF0U
+        && g_legacyV98.childHashOffset == 0x60U
+        && g_legacyV98.descriptorVectorOffset == 0x78U
+        && g_legacyV98.descriptorCountOffset == 0x80U
+        && g_legacyV98.descriptorCapacityOffset == 0x82U
+        && g_legacyV98.descriptorStride == 0x18U
+        && g_legacyV98.descriptorGroupOffset == 0x00U
+        && g_legacyV98.descriptorAssociatedOffset == 0x08U
+        && g_legacyV98.descriptorAssociatedCountOffset == 0x10U
+        && g_legacyV98.descriptorCount == 2
+        && g_legacyV98.mapDescriptorIndex == 1
+        && g_legacyV98.mapAssociatedCount == 4
+        && g_legacyV98.mapBennyCount == 1
+        && g_legacyV98.storyBennyCount == 0
+        && g_legacyV98.derivedVectorOffset == 0xD8U
+        && g_legacyV98.derivedCountOffset == 0xE0U
+        && g_legacyV98.derivedCapacityOffset == 0xE2U
+        && g_legacyV98.derivedFlagsOffset == 0xE8U
+        && g_legacyV98.derivedCount == 2
+        && g_legacyV98.derivedCapacity == 2
+        && g_legacyV98.derivedFlags == 0x09U
+        && g_legacyV98.overlayRegistryOffset == 0x08U
+        && g_legacyV98.overlayExactMapHits == 1
+        && g_legacyV98.overlayExactStoryHits == 0
+        && g_legacyV98.overlayRecord != 0
+        && g_legacyV98.lowriderChild != 0
+        && g_legacyV98.constructionOwner != 0
+        && g_legacyV98.constructionCallsite != 0
+        && g_legacyV98.addMutator != 0;
+}
+
+static bool VerifyLegacyV98OlderConstructionOwnerAbi()
+{
+    if (!IsLegacyV98OlderMutationLayoutSafe())
+        return false;
+
+    uint8_t* base = nullptr;
+    uint8_t* end = nullptr;
+    if (!GetExeRange(base, end)
+        || !base
+        || !end
+        || end <= base)
+    {
+        return false;
+    }
+
+    uint8_t* owner =
+        reinterpret_cast<uint8_t*>(
+            g_legacyV98.constructionOwner);
+    uint8_t* callsite =
+        reinterpret_cast<uint8_t*>(
+            g_legacyV98.constructionCallsite);
+    uint8_t* mutator =
+        reinterpret_cast<uint8_t*>(
+            g_legacyV98.addMutator);
+
+    uint8_t* ownerStart = nullptr;
+    uint8_t* ownerEnd = nullptr;
+    uint8_t* mutatorStart = nullptr;
+    uint8_t* mutatorEnd = nullptr;
+
+    const bool ownerBounds =
+        owner >= base
+        && owner < end
+        && FindRuntimeFunctionBounds(
+            base,
+            end,
+            owner,
+            ownerStart,
+            ownerEnd)
+        && ownerStart == owner
+        && ownerEnd > ownerStart;
+
+    const bool mutatorBounds =
+        mutator >= base
+        && mutator < end
+        && FindRuntimeFunctionBounds(
+            base,
+            end,
+            mutator,
+            mutatorStart,
+            mutatorEnd)
+        && mutatorStart == mutator
+        && mutatorEnd > mutatorStart;
+
+    if (!ownerBounds
+        || !mutatorBounds
+        || callsite < owner
+        || callsite + 5 > ownerEnd)
+    {
+        return false;
+    }
+
+    static const uint8_t argumentCapture[] =
+    {
+        0x49, 0x8B, 0xF0,
+        0x4C, 0x8B, 0xFA,
+        0x48, 0x8B, 0xF9
+    };
+
+    static const uint8_t descriptorGate[] =
+    {
+        0x44, 0x0F, 0xB7, 0x8F, 0x80, 0x00, 0x00, 0x00,
+        0x41, 0x8B, 0x07
+    };
+
+    static const uint8_t associatedRead[] =
+    {
+        0x8B, 0x06
+    };
+
+    bool argumentCaptureVerified = false;
+    bool descriptorGateVerified = false;
+    bool associatedReadVerified = false;
+    bool callVerified = false;
+    bool callShapeVerified = false;
+    bool addTrueVerified = false;
+    bool faulted = false;
+
+    __try
+    {
+        argumentCaptureVerified =
+            owner + 0x28 <= ownerEnd
+            && memcmp(
+                owner + 0x1F,
+                argumentCapture,
+                sizeof(argumentCapture)) == 0;
+
+        descriptorGateVerified =
+            owner + 0x38 <= ownerEnd
+            && memcmp(
+                owner + 0x2D,
+                descriptorGate,
+                sizeof(descriptorGate)) == 0;
+
+        associatedReadVerified =
+            owner + 0x72 <= ownerEnd
+            && memcmp(
+                owner + 0x70,
+                associatedRead,
+                sizeof(associatedRead)) == 0;
+
+        if (callsite[0] == 0xE8)
+        {
+            int32_t relative = 0;
+            memcpy(
+                &relative,
+                callsite + 1,
+                sizeof(relative));
+            callVerified =
+                callsite + 5 + relative == mutator;
+        }
+
+        callShapeVerified =
+            HasLegacyV98PairPointerCallShape(
+                owner,
+                callsite);
+
+        addTrueVerified =
+            HasLegacyV98AddTrueSetup(
+                owner,
+                callsite);
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER)
+    {
+        faulted = true;
+    }
+
+    const bool verified =
+        !faulted
+        && argumentCaptureVerified
+        && descriptorGateVerified
+        && associatedReadVerified
+        && callVerified
+        && callShapeVerified
+        && addTrueVerified;
+
+    Logf(
+        "[UniversalLegacyV104] ownerAbi owner=%p size=0x%llX callsite=%p offset=0x%llX mutator=%p checks{argumentCapture=%s descriptorGate=%s associatedRead=%s rel32Target=%s pairPointers=%s addTrue=%s} faulted=%s verified=%s.",
+        owner,
+        static_cast<unsigned long long>(
+            ownerEnd - owner),
+        callsite,
+        static_cast<unsigned long long>(
+            callsite - owner),
+        mutator,
+        argumentCaptureVerified ? "yes" : "no",
+        descriptorGateVerified ? "yes" : "no",
+        associatedReadVerified ? "yes" : "no",
+        callVerified ? "yes" : "no",
+        callShapeVerified ? "yes" : "no",
+        addTrueVerified ? "yes" : "no",
+        faulted ? "yes" : "no",
+        verified ? "yes" : "no");
+
+    return verified;
+}
+
+static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
+{
+    if (!IsOlderLegacyLowridersBuild())
+        return false;
+
+    BennysMapState state =
+        CaptureBennysMapState();
+
+    if (IsBennysMapReadyForOlderLegacy(state))
+    {
+        ActivateBennysInterior(state);
+        return true;
+    }
+
+    if (g_legacyV98OlderMutationCommitted)
+    {
+        LogBennysMapState(
+            "[UniversalLegacyV104] construction was already committed; waiting for Benny's to finish streaming.",
+            state);
+        return false;
+    }
+
+    if (g_legacyV98OlderMutationAttempted)
+    {
+        Logf(
+            "[UniversalLegacyV104] REFUSED: the dynamic construction call was already attempted this session and will not be repeated. faulted=%s.",
+            g_legacyV98OlderMutationFaulted ? "yes" : "no");
+        return false;
+    }
+
+    const bool resolved =
+        RunLegacyV98UniversalResolver(
+            manualRetry
+                ? "manual v104 older-Legacy mutation gate"
+                : "initial v104 older-Legacy mutation gate");
+
+    if (!resolved
+        || !IsLegacyV98OlderMutationLayoutSafe())
+    {
+        Logf(
+            "[UniversalLegacyV104] Runtime resolver did not satisfy the exact frozen Legacy layout/fingerprint gate. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
+        return false;
+    }
+
+    if (!VerifyLegacyV98OlderConstructionOwnerAbi())
+    {
+        Logf(
+            "[UniversalLegacyV104] Runtime construction owner failed the frozen ABI/call-shape proof. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
+        return false;
+    }
+
+    g_legacyV73OverlayGate =
+        LegacyV73OverlayGateState{};
+    g_legacyV73OverlayGate.scanned = true;
+    g_legacyV73OverlayGate.exactSingleMap = true;
+    g_legacyV73OverlayGate.contiguousMapHits = 1;
+    g_legacyV73OverlayGate.contiguousStoryHits = 0;
+    g_legacyV73OverlayGate.recordAddress =
+        g_legacyV98.overlayRecord;
+    g_legacyV73OverlayGate.groupValue =
+        0xBCC89179U;
+    g_legacyV73OverlayGate.unknown04 =
+        0xF9904BBCU;
+    g_legacyV73OverlayGate.flags = 1U;
+
+    if (!ApplyLegacyV76OverlayStoryClassification())
+    {
+        Logf(
+            "[UniversalLegacyV104] Exact overlay record was resolved but the verified GROUP_MAP -> GROUP_MAP_SP rewrite was refused. Falling back without touching setup2 descriptors.");
+        return false;
+    }
+
+    g_legacyV61AllowUniversalOlderBuild = true;
+    const bool descriptorApplied =
+        ApplyLegacyV61DescriptorView(
+            g_legacyV98.lowriderChild);
+    g_legacyV61AllowUniversalOlderBuild = false;
+
+    if (!descriptorApplied)
+    {
+        RestoreLegacyV76OverlayClassificationOnFailure();
+        Logf(
+            "[UniversalLegacyV104] Exact temporary descriptor view could not be applied. Overlay rollback was attempted and the Rockstar construction owner was not called.");
+        return false;
+    }
+
+    const bool temporaryDescriptorVerified =
+        VerifyLegacyV73TemporaryDescriptor(
+            g_legacyV98.lowriderChild);
+
+    LegacyV67DerivedSetup2Snapshot before =
+        CaptureLegacyV67DerivedSetup2Snapshot(
+            g_legacyV98.lowriderChild,
+            "v104 older-Legacy pre-construction exact stock derived baseline");
+
+    const bool stockDerived =
+        before.valid
+        && before.count == 2
+        && before.capacity == 2
+        && before.flagsE8 == 0x09
+        && before.captured >= 2
+        && before.first[0] == 0x5BF6578FU
+        && before.second[0] == 0xA0DF2C6FU
+        && before.first[1] == 0x5BF6578FU
+        && before.second[1] == 0x37B569AAU
+        && CountLegacyV73DerivedPair(
+            before,
+            0x578F99E2U,
+            0x4CDFC843U) == 0;
+
+    if (!temporaryDescriptorVerified
+        || !stockDerived)
+    {
+        const bool descriptorRestored =
+            RestoreLegacyV61DescriptorView();
+        const bool overlayRestored =
+            RestoreLegacyV76OverlayClassificationOnFailure();
+
+        Logf(
+            "[UniversalLegacyV104] REFUSED before construction: temporaryDescriptor=%s exactStockDerived=%s descriptorRestored=%s overlayRestored=%s.",
+            temporaryDescriptorVerified ? "yes" : "no",
+            stockDerived ? "yes" : "no",
+            descriptorRestored ? "yes" : "no",
+            overlayRestored ? "yes" : "no");
+        return false;
+    }
+
+    uint32_t storyGroup =
+        0x578F99E2U;
+    uint32_t benny =
+        0x4CDFC843U;
+
+    RockstarLegacyV73ConstructionPairOwner owner =
+        reinterpret_cast<
+            RockstarLegacyV73ConstructionPairOwner>(
+                g_legacyV98.constructionOwner);
+
+    g_legacyV98OlderMutationAttempted = true;
+    g_legacyV98.mutationAttempted = true;
+
+    bool constructionCalled = false;
+    bool constructionFaulted = false;
+
+    __try
+    {
+        owner(
+            reinterpret_cast<void*>(
+                g_legacyV98.lowriderChild),
+            &storyGroup,
+            &benny);
+        constructionCalled = true;
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER)
+    {
+        constructionFaulted = true;
+        constructionCalled = false;
+    }
+
+    LegacyV67DerivedSetup2Snapshot after =
+        CaptureLegacyV67DerivedSetup2Snapshot(
+            g_legacyV98.lowriderChild,
+            "v104 older-Legacy post-construction before descriptor restore");
+
+    const uint16_t storyBennyAfter =
+        CountLegacyV73DerivedPair(
+            after,
+            0x578F99E2U,
+            0x4CDFC843U);
+
+    const bool pairPresent =
+        storyBennyAfter == 1;
+
+    const bool exactDerived =
+        after.valid
+        && after.count == 3
+        && after.capacity >= 3
+        && after.flagsE8 == 0x09
+        && after.captured >= 3
+        && after.first[0] == 0x5BF6578FU
+        && after.second[0] == 0xA0DF2C6FU
+        && after.first[1] == 0x5BF6578FU
+        && after.second[1] == 0x37B569AAU
+        && pairPresent;
+
+    const bool descriptorRestored =
+        RestoreLegacyV61DescriptorView();
+
+    const bool committed =
+        constructionCalled
+        && !constructionFaulted
+        && descriptorRestored
+        && pairPresent
+        && exactDerived;
+
+    g_legacyV98OlderMutationCommitted =
+        committed;
+    g_legacyV98OlderMutationFaulted =
+        constructionFaulted
+        || !descriptorRestored;
+
+    if (!committed)
+    {
+        const bool overlayRestored =
+            RestoreLegacyV76OverlayClassificationOnFailure();
+
+        Logf(
+            "[UniversalLegacyV104] FAILED construction commit called=%s faulted=%s descriptorRestored=%s pairStoryBenny=%s exact3of3=%s overlayRollback=%s. The dynamic construction call is latched and will not be repeated this session.",
+            constructionCalled ? "yes" : "no",
+            constructionFaulted ? "yes" : "no",
+            descriptorRestored ? "yes" : "no",
+            pairPresent ? "yes" : "no",
+            exactDerived ? "yes" : "no",
+            overlayRestored ? "yes" : "no");
+        return false;
+    }
+
+    state = CaptureBennysMapState();
+    if (IsBennysMapReadyForOlderLegacy(state))
+    {
+        ActivateBennysInterior(state);
+        LogBennysMapState(
+            "[UniversalLegacyV104] SUCCESS: runtime-resolved Legacy construction loaded Benny's.",
+            state);
+        return true;
+    }
+
+    LogBennysMapState(
+        "[UniversalLegacyV104] Construction committed exactly once; retaining the verified GROUP_MAP_SP overlay classification while passive streaming completes.",
+        state);
+    return false;
+}
+
 static bool TryLoadBennysMap(bool manualRetry)
 {
     BennysMapState state = CaptureBennysMapState();
@@ -38392,7 +38840,15 @@ static bool TryLoadBennysMap(bool manualRetry)
     }
 
     if (olderLegacyFallback)
+    {
+        if (TryLoadBennysMapOlderLegacyUniversal(manualRetry))
+            return true;
+
+        if (g_legacyV98OlderMutationCommitted)
+            return false;
+
         return TryLoadBennysMapOlderLegacyIplFallback(manualRetry);
+    }
 
     if (!manualRetry)
         g_legacyV87RetrySafe = false;
@@ -38620,7 +39076,9 @@ static bool IsProductionStartupPending(
     }
 
     return g_legacyV87RetrySafe
-        || IsLegacyV87ConstructionCommitted();
+        || IsLegacyV87ConstructionCommitted()
+        || (IsOlderLegacyLowridersBuild()
+            && g_legacyV98OlderMutationCommitted);
 }
 
 static void EmitProductionFailureDiagnostics(
@@ -38768,7 +39226,7 @@ void ScriptMain()
     }
     else
     {
-        Logf("[Info] Legacy v98e universal resolver is frozen/proven read-only on the reference build. Frozen build-102 v92/v77 remains the only Legacy mutation path; v99 adds Enhanced read-only resolver research without changing Enhanced v96/v55 mutation.");
+        Logf("[Info] Legacy v104 enables the v98e universal resolver as a strictly gated one-shot construction path for older Legacy builds when the runtime layout, overlay row, descriptor vectors, derived vector, and construction ABI all match the proven Legacy fingerprint. Frozen build-102 v92/v77 and Enhanced behavior remain unchanged.");
         LogLegacyNaturalDescriptorState("startup");
         LogLegacyV59PostConstructionState("startup");
     }
@@ -38941,7 +39399,7 @@ void ScriptMain()
         loaded,
         enhanced
             ? "Enhanced v100b tightened startup/mutation validation failed."
-            : "Legacy frozen startup path failed before a retryable/committed state.");
+            : "Legacy startup path failed before a retryable/committed state.");
 
     const bool productionSuccess =
         IsProductionStartupSuccess(
@@ -38952,7 +39410,10 @@ void ScriptMain()
     {
         if (productionSuccess)
             Notify("~b~~h~[ Benny's Map Loader ]~h~~w~  ~w~~h~Loaded~w~");
-        else if (!enhanced && IsLegacyV87ConstructionCommitted())
+        else if (!enhanced
+            && (IsLegacyV87ConstructionCommitted()
+                || (IsOlderLegacyLowridersBuild()
+                    && g_legacyV98OlderMutationCommitted)))
             Notify("~b~~h~[ Benny's Map Loader ]~h~~w~  Legacy content constructed - waiting for streaming");
         else if (!enhanced && g_legacyV87RetrySafe)
             Notify("~y~~h~[ Benny's Map Loader ]~h~~w~  Legacy startup not ready - retrying automatically");
