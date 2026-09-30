@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <share.h>
@@ -15,9 +16,10 @@
 #include "natives.h"
 
 static const char* g_iniPath = ".\\BennysMapLoader.ini";
+static const char* g_bennysSettingsPath = ".\\scripts\\BennysMotorworksRevamped.ini";
 static const char* g_logPath = "BennysMapLoader.log";
 
-static const char* kBuildTag = "v104 universal Legacy runtime loader + directional garage door recovery";
+static const char* kBuildTag = "v106 universal Legacy runtime loader + INI-synchronized vehicle-gated directional garage door recovery";
 
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
@@ -992,6 +994,27 @@ static bool g_bennysGarageDoorInsideExitOpening = false;
 static bool g_bennysGarageDoorDepthSampleValid = false;
 static float g_bennysGarageDoorLastInteriorDepth = 0.0f;
 
+static bool g_bennysAllowEmergencyVehicles = true;
+static bool g_bennysAllowServiceVehicles = true;
+static bool g_bennysAllowUtilityVehicles = true;
+static bool g_bennysAllowOversizedVehicles = true;
+
+static constexpr float kMaximumWorkshopVehicleWidth = 3.0f;
+static constexpr float kMaximumWorkshopVehicleLength = 7.0f;
+static constexpr float kMaximumWorkshopVehicleHeight = 3.5f;
+static constexpr float kAbsoluteMaximumWorkshopVehicleWidth = 4.0f;
+static constexpr float kAbsoluteMaximumWorkshopVehicleLength = 8.5f;
+static constexpr float kAbsoluteMaximumWorkshopVehicleHeight = 4.25f;
+
+struct BennysGarageDoorOversizeCacheEntry
+{
+    uint32_t modelHash;
+    bool oversized;
+};
+
+static std::vector<BennysGarageDoorOversizeCacheEntry>
+    g_bennysGarageDoorOversizeCache;
+
 static bool IsEnhancedExecutableImage()
 {
     char path[MAX_PATH]{};
@@ -1184,6 +1207,43 @@ static const char* kBennysLowriderIpls[] =
 static int ReadIniInt(const char* file, const char* section, const char* key, int defVal)
 {
     return GetPrivateProfileIntA(section, key, defVal, file);
+}
+
+static bool ReadIniBool(
+    const char* file,
+    const char* section,
+    const char* key,
+    bool defVal)
+{
+    char value[32]{};
+    const DWORD length = GetPrivateProfileStringA(
+        section,
+        key,
+        defVal ? "true" : "false",
+        value,
+        static_cast<DWORD>(sizeof(value)),
+        file);
+
+    if (length == 0)
+        return defVal;
+
+    if (_stricmp(value, "true") == 0
+        || _stricmp(value, "yes") == 0
+        || _stricmp(value, "on") == 0
+        || strcmp(value, "1") == 0)
+    {
+        return true;
+    }
+
+    if (_stricmp(value, "false") == 0
+        || _stricmp(value, "no") == 0
+        || _stricmp(value, "off") == 0
+        || strcmp(value, "0") == 0)
+    {
+        return false;
+    }
+
+    return defVal;
 }
 
 static void Notify(const std::string& text)
@@ -29157,6 +29217,167 @@ static void SetBennysGarageDoorHoldOpen(
     nativeCall();
 }
 
+static bool IsBennysGarageDoorAlwaysDeniedVehicleClass(int vehicleClass)
+{
+    // Mirrors Helper.unWelcome: Cycles, Boats, Helicopters, Planes.
+    return vehicleClass == 13
+        || vehicleClass == 14
+        || vehicleClass == 15
+        || vehicleClass == 16;
+}
+
+static bool TryGetCachedBennysGarageDoorOversizeResult(
+    uint32_t modelHash,
+    bool& oversized)
+{
+    for (const BennysGarageDoorOversizeCacheEntry& entry
+        : g_bennysGarageDoorOversizeCache)
+    {
+        if (entry.modelHash == modelHash)
+        {
+            oversized = entry.oversized;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool IsBennysGarageDoorOversizedVehicle(Vehicle vehicle)
+{
+    if (vehicle == 0
+        || !ENTITY::DOES_ENTITY_EXIST(vehicle))
+    {
+        return false;
+    }
+
+    if (VEHICLE::IS_VEHICLE_ATTACHED_TO_TRAILER(vehicle))
+        return true;
+
+    const uint32_t modelHash =
+        static_cast<uint32_t>(
+            ENTITY::GET_ENTITY_MODEL(vehicle));
+
+    if (modelHash == 0)
+        return false;
+
+    bool cachedOversized = false;
+    if (TryGetCachedBennysGarageDoorOversizeResult(
+            modelHash,
+            cachedOversized))
+    {
+        return cachedOversized;
+    }
+
+    Vector3 minimum{};
+    Vector3 maximum{};
+    GAMEPLAY::GET_MODEL_DIMENSIONS(
+        modelHash,
+        &minimum,
+        &maximum);
+
+    const float widthRaw = maximum.x - minimum.x;
+    const float lengthRaw = maximum.y - minimum.y;
+    const float heightRaw = maximum.z - minimum.z;
+
+    const float width = widthRaw >= 0.0f ? widthRaw : -widthRaw;
+    const float length = lengthRaw >= 0.0f ? lengthRaw : -lengthRaw;
+    const float height = heightRaw >= 0.0f ? heightRaw : -heightRaw;
+
+    // Mirrors the current Helper.cs oversized-vehicle policy. Invalid model
+    // dimensions are treated as non-oversized rather than blocking entry.
+    if (!std::isfinite(width)
+        || !std::isfinite(length)
+        || !std::isfinite(height)
+        || width <= 0.0f
+        || length <= 0.0f
+        || height <= 0.0f)
+    {
+        return false;
+    }
+
+    int exceededWorkshopDimensions = 0;
+    if (width > kMaximumWorkshopVehicleWidth)
+        ++exceededWorkshopDimensions;
+    if (length > kMaximumWorkshopVehicleLength)
+        ++exceededWorkshopDimensions;
+    if (height > kMaximumWorkshopVehicleHeight)
+        ++exceededWorkshopDimensions;
+
+    const bool oversized =
+        width > kAbsoluteMaximumWorkshopVehicleWidth
+        || length > kAbsoluteMaximumWorkshopVehicleLength
+        || height > kAbsoluteMaximumWorkshopVehicleHeight
+        || exceededWorkshopDimensions >= 2;
+
+    g_bennysGarageDoorOversizeCache.push_back(
+        { modelHash, oversized });
+
+    return oversized;
+}
+
+static bool IsCurrentBennysGarageDoorVehicleAllowed()
+{
+    const Ped playerPed = PLAYER::PLAYER_PED_ID();
+    if (playerPed == 0
+        || !PED::IS_PED_IN_ANY_VEHICLE(
+            playerPed,
+            false))
+    {
+        return false;
+    }
+
+    const Vehicle vehicle =
+        PED::GET_VEHICLE_PED_IS_IN(
+            playerPed,
+            false);
+
+    if (vehicle == 0
+        || !ENTITY::DOES_ENTITY_EXIST(vehicle))
+    {
+        return false;
+    }
+
+    const int vehicleClass =
+        VEHICLE::GET_VEHICLE_CLASS(vehicle);
+
+    if (IsBennysGarageDoorAlwaysDeniedVehicleClass(
+            vehicleClass))
+    {
+        return false;
+    }
+
+    // GTA vehicle classes: Utility=11, Service=17, Emergency=18.
+    if (!g_bennysAllowEmergencyVehicles
+        && vehicleClass == 18)
+    {
+        return false;
+    }
+
+    if (!g_bennysAllowServiceVehicles
+        && vehicleClass == 17)
+    {
+        return false;
+    }
+
+    if (!g_bennysAllowUtilityVehicles
+        && vehicleClass == 11)
+    {
+        return false;
+    }
+
+    // Keep the oversized policy independent of class policy: an allowed
+    // Service/Utility vehicle is still denied when it is oversized and
+    // AllowOversizedVehicles=false, matching Helper.cs.
+    if (!g_bennysAllowOversizedVehicles
+        && IsBennysGarageDoorOversizedVehicle(vehicle))
+    {
+        return false;
+    }
+
+    return true;
+}
+
 static bool GetBennysGarageDoorPlayerGeometry(
     float& distanceSquared,
     float& interiorDepth)
@@ -29398,6 +29619,10 @@ static void MaintainBennysGarageDoorRecovery(
         <= (kBennysGarageDoorInsideExitAssistDistance
             * kBennysGarageDoorInsideExitAssistDistance);
 
+    const bool currentVehicleAllowed =
+        withinDoorRetryDistance
+        && IsCurrentBennysGarageDoorVehicleAllowed();
+
     if (!g_bennysGarageDoorInsideLatched
         && interiorDepth >= kBennysGarageDoorInsideCloseDepth)
     {
@@ -29425,6 +29650,12 @@ static void MaintainBennysGarageDoorRecovery(
         }
         else
         {
+            if (!currentVehicleAllowed)
+            {
+                g_bennysGarageDoorInsideExitOpening = false;
+                MaintainBennysGarageDoorClosedRecovery(now);
+                return;
+            }
 
             if (!g_bennysGarageDoorInsideExitOpening
                 && movingTowardOutside
@@ -29452,7 +29683,8 @@ static void MaintainBennysGarageDoorRecovery(
         }
     }
 
-    if (withinOutsideAssistDistance)
+    if (withinOutsideAssistDistance
+        && currentVehicleAllowed)
     {
         MaintainBennysGarageDoorOpenRecovery(now);
     }
@@ -39174,6 +39406,34 @@ void ScriptMain()
             "GarageDoorRecovery",
             1) != 0);
 
+    g_bennysAllowEmergencyVehicles =
+        ReadIniBool(
+            g_bennysSettingsPath,
+            "SETTINGS",
+            "AllowEmergencyVehicles",
+            true);
+
+    g_bennysAllowServiceVehicles =
+        ReadIniBool(
+            g_bennysSettingsPath,
+            "SETTINGS",
+            "AllowServiceVehicles",
+            true);
+
+    g_bennysAllowUtilityVehicles =
+        ReadIniBool(
+            g_bennysSettingsPath,
+            "SETTINGS",
+            "AllowUtilityVehicles",
+            true);
+
+    g_bennysAllowOversizedVehicles =
+        ReadIniBool(
+            g_bennysSettingsPath,
+            "SETTINGS",
+            "AllowOversizedVehicles",
+            true);
+
     g_experimentalMemoryPatch = false;
     g_experimentalInternalGroupAdd = false;
     g_experimentalMapStateReprocess = false;
@@ -39219,7 +39479,8 @@ void ScriptMain()
     Logf("[Info] Detected edition: %s", GetEditionTag(enhanced));
     Logf("[Info] getGameVersion()=%d", gameVersion);
     Logf("[Info] Logging=%s diagnostics=%s deepMemoryDiagnostics=%s garageDoorRecovery=%s experimentalMemoryPatch=%s experimentalInternalGroupAdd=%s experimentalMapStateReprocess=%s experimentalOverlayDescriptorRewrite=%s", g_logEnabled ? "on" : "off", g_diagnosticsEnabled ? "on" : "off", g_deepMemoryDiagnostics ? "on" : "off", g_bennysGarageDoorRecoveryEnabled ? "on" : "off", g_experimentalMemoryPatch ? "on" : "off", g_experimentalInternalGroupAdd ? "on" : "off", g_experimentalMapStateReprocess ? "on" : "off", g_experimentalOverlayDescriptorRewrite ? "on" : "off");
-    Logf("[Info] Cross-build garage-door recovery is %s. It preloads the stock shutter model, keeps the original 15 m exterior approach trigger, closes after the player crosses into the workshop, and reopens only when approaching the shutter from inside; it is not tied to a GTA build number.", g_bennysGarageDoorRecoveryEnabled ? "enabled" : "disabled");
+    Logf("[Info] Cross-build garage-door recovery is %s. It preloads the stock shutter model, keeps the original 15 m exterior approach trigger, closes after the player crosses into the workshop, and reopens only for an allowed current vehicle; it is not tied to a GTA build number.", g_bennysGarageDoorRecoveryEnabled ? "enabled" : "disabled");
+    Logf("[Info] Garage-door vehicle policy mirrors BennysMotorworksRevamped.ini: AllowEmergencyVehicles=%s AllowServiceVehicles=%s AllowUtilityVehicles=%s AllowOversizedVehicles=%s; boats/cycles/helicopters/planes are always rejected and on-foot opening is disabled.", g_bennysAllowEmergencyVehicles ? "true" : "false", g_bennysAllowServiceVehicles ? "true" : "false", g_bennysAllowUtilityVehicles ? "true" : "false", g_bennysAllowOversizedVehicles ? "true" : "false");
     if (enhanced)
     {
         Logf("[Info] v100b tightened production integration is active. Enhanced Benny patching is limited to the verified C26F00 construction path; Legacy build-102 mutation behavior is unchanged; v99d/v98e read-only resolvers are retained for automatic failure diagnostics only.");
