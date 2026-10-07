@@ -19,7 +19,7 @@ static const char* g_iniPath = ".\\BennysMapLoader.ini";
 static const char* g_bennysSettingsPath = ".\\scripts\\BennysMotorworksRevamped.ini";
 static const char* g_logPath = "BennysMapLoader.log";
 
-static const char* kBuildTag = "v106 universal Legacy runtime loader + INI-synchronized vehicle-gated directional garage door recovery";
+static const char* kBuildTag = "v113 tiered cross-build construction locator + v111b deferred construction";
 
 static bool g_logEnabled = true;
 static bool g_diagnosticsEnabled = true;
@@ -28,6 +28,29 @@ static bool g_startupDebugCapture = true;
 static bool g_productionLogFinalized = false;
 static bool g_productionLogSuccess = false;
 static bool g_startupDebugTruncated = false;
+
+// Experimental builds keep the complete diagnostic log after success instead
+// of collapsing it to the normal single-line production success message.
+static constexpr bool kExperimentalVerboseSuccessLog = true;
+
+// Enhanced isolation keeps the V100 hook/resolver observable while suppressing
+// its natural startup descriptor injection. v111 then performs construction only
+// after stable gameplay so startup timing is no longer part of the activation path.
+static constexpr bool kExperimentalEnhancedLateRefreshIsolation = true;
+
+// v110 proved that the verified Rockstar construction replay can be deferred
+// until normal gameplay and that the replay itself activates Benny on Enhanced.
+static constexpr bool kExperimentalEnhancedDeferredReplay = true;
+static bool g_experimentalEnhancedDeferredReplayAttempted = false;
+static bool g_experimentalEnhancedDeferredReplayStrictSuccess = false;
+
+// v111 extends the deferred-construction timing model to Legacy without sharing
+// Enhanced-only addresses or call ABIs. Legacy reuses its own already-verified
+// v104 (older builds) or v92/v77 (build 102) construction path after gameplay
+// settles. Existing Legacy safety gates and older-build IPL fallback remain intact.
+static constexpr bool kExperimentalCrossEditionDeferredConstruction = true;
+static bool g_experimentalLegacyDeferredConstructionAttempted = false;
+static bool g_experimentalLegacyDeferredConstructionExecuting = false;
 static SRWLOCK g_productionLogLock = SRWLOCK_INIT;
 static std::string g_startupDebugBuffer;
 static bool g_deepMemoryDiagnostics = false;
@@ -41,6 +64,19 @@ static bool g_experimentalInternalGroupAddApplied = false;
 static bool g_experimentalMapStateReprocess = false;
 
 static bool g_experimentalOverlayDescriptorRewrite = false;
+
+// One-shot post-load construction experiment. Enhanced replays Rockstar's
+// verified Lowriders construction pass; Legacy reuses its edition-specific
+// verified construction path. No construction operation is repeated per frame.
+static bool g_lateGameMapRefreshEnabled = true;
+static bool g_lateGameMapRefreshAttempted = false;
+static bool g_lateGameMapRefreshIplsRequested = false;
+static bool g_lateGameMapRefreshSettledLogged = false;
+static ULONGLONG g_lateGameMapRefreshGameplayReadySince = 0;
+static ULONGLONG g_lateGameMapRefreshRequestedAt = 0;
+static DWORD g_lateGameMapRefreshDelayMs = 2500;
+static DWORD g_lateGameMapRefreshSettleMs = 5000;
+
 static bool g_overlayDescriptorRewriteApplied = false;
 static bool g_overlayDescriptorRewriteVerified = false;
 static uintptr_t g_overlayDescriptorRewriteRecord = 0;
@@ -471,6 +507,14 @@ static uint32_t g_v79SyntheticAssociated[1] =
 
 static void LogV79LateReplayState(const char* phase);
 static bool RunV79EnhancedLateC26F00Replay();
+static bool TryLoadBennysMap(bool manualRetry);
+
+// Deferred-construction helpers are declared here because the late-game state
+// machine is defined before the Legacy implementation/state block below. Keep
+// the actual Legacy globals private to their original section.
+static bool IsLegacyV98OlderMutationCommittedForDeferredConstruction();
+static bool IsLegacyV87ConstructionCommittedForDeferredConstruction();
+static bool IsLegacyV87RetrySafeForDeferredConstruction();
 
 alignas(16) static uint8_t g_v55DescriptorScratch[
     (static_cast<size_t>(64) + 1) * 0x18]{};
@@ -485,6 +529,7 @@ struct EnhancedV100RuntimeResolverState
     bool bootstrapReady;
     bool bootstrapFaulted;
     uint32_t structuralChains;
+    uint32_t ownerCallsToGroupLoop;
     uintptr_t owner;
     uintptr_t groupLoop;
     uintptr_t workerCallsite;
@@ -542,6 +587,12 @@ static uint32_t g_v100SyntheticAssociated[1] =
     0x4CDFC843U
 };
 
+static bool EnhancedV112MatchesGroupLoopEntry(
+    uint8_t* start,
+    uint8_t* finish);
+static bool EnhancedV112MatchesWorkerEntry(
+    uint8_t* start,
+    uint8_t* finish);
 static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad();
 static bool ResolveEnhancedV100LiveMutationLayout(
     void* context,
@@ -1299,7 +1350,8 @@ static void CaptureOrWriteLogLine(
         &g_productionLogLock);
 
     if (g_productionLogFinalized
-        && g_productionLogSuccess)
+        && g_productionLogSuccess
+        && !kExperimentalVerboseSuccessLog)
     {
         ReleaseSRWLockExclusive(
             &g_productionLogLock);
@@ -1402,19 +1454,47 @@ static void FinalizeProductionSuccessLog(
 
     if (g_logEnabled)
     {
-        ResetLogFile();
+        if (kExperimentalVerboseSuccessLog)
+        {
+            // Preserve everything captured during startup so this experimental
+            // build can show exactly which path made Benny's available.
+            ResetLogFile();
 
-        char line[160]{};
-        _snprintf_s(
-            line,
-            sizeof(line),
-            _TRUNCATE,
-            "SUCCESS - Benny's Map Loader loaded successfully (%s).\n",
-            enhanced ? "Enhanced" : "Legacy");
+            if (!g_startupDebugBuffer.empty())
+            {
+                WriteLogTextDirect(
+                    g_startupDebugBuffer.data(),
+                    g_startupDebugBuffer.size());
+            }
 
-        WriteLogTextDirect(
-            line,
-            strlen(line));
+            char line[256]{};
+            _snprintf_s(
+                line,
+                sizeof(line),
+                _TRUNCATE,
+                "[ExperimentalLog] SUCCESS - Benny's Map Loader loaded successfully (%s). Full diagnostic logging remains active after success.\n",
+                enhanced ? "Enhanced" : "Legacy");
+
+            WriteLogTextDirect(
+                line,
+                strlen(line));
+        }
+        else
+        {
+            ResetLogFile();
+
+            char line[160]{};
+            _snprintf_s(
+                line,
+                sizeof(line),
+                _TRUNCATE,
+                "SUCCESS - Benny's Map Loader loaded successfully (%s).\n",
+                enhanced ? "Enhanced" : "Legacy");
+
+            WriteLogTextDirect(
+                line,
+                strlen(line));
+        }
     }
 
     g_startupDebugBuffer.clear();
@@ -3457,7 +3537,7 @@ static const char* GetMidFilterFailureReason()
     case 1: return "exe-module-unavailable";
     case 2: return "bad-dos-signature";
     case 3: return "bad-nt-signature";
-    case 4: return "verified-rva-outside-image";
+    case 4: return "located-address-outside-image";
     case 5: return "C27931-live-compare-mismatch";
     case 6: return "C27E50-tail-arg-shape-mismatch";
     case 7: return "mapState-already-constructed";
@@ -7115,11 +7195,17 @@ static uintptr_t V52C26F00SourceIteratorCallerDetour(
                 0);
         }
 
-        if (g_v79EnhancedLateReplayExperiment)
+        if (g_v79EnhancedLateReplayExperiment
+            || kExperimentalEnhancedLateRefreshIsolation)
         {
-
             InterlockedIncrement(
                 &g_v79NaturalInjectionSuppressedHits);
+
+            if (kExperimentalEnhancedLateRefreshIsolation)
+            {
+                Logf(
+                    "[LateMapIsolation] Suppressed Enhanced V100 Benny descriptor injection at the verified natural Story-mode construction call; original Rockstar processing continues unchanged.");
+            }
         }
         else
         {
@@ -7555,8 +7641,8 @@ static const char* GetV52C26F00FailureReason()
     case 2: return "bad-dos-signature";
     case 3: return "bad-nt-signature";
     case 4: return "verified-rva-outside-image";
-    case 5: return "C26F00-prefix-mismatch";
-    case 6: return "C26F83-direct-C272A0-call-mismatch";
+    case 5: return "located-group-loop-entry-pattern-not-safe";
+    case 6: return "located-group-loop-worker-call-mismatch";
     case 7: return "mapState-already-constructed";
     case 8: return "trampoline-allocation-failed";
     case 9: return "VirtualProtect-failed";
@@ -7585,6 +7671,27 @@ static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
     {
         g_v52C26F00FailureCode = 11;
         return;
+    }
+
+    {
+        uint8_t* imageBase = nullptr;
+        uint8_t* imageEnd = nullptr;
+        if (GetExeRange(imageBase, imageEnd)
+            && imageBase
+            && imageEnd > imageBase)
+        {
+            Logf(
+                "[CrossBuildLocator] Enhanced unique construction chain resolved ownerRVA=0x%llX groupLoopRVA=0x%llX workerCallRVA=0x%llX workerRVA=0x%llX ownerCalls=%u. Patch will proceed only after entry-pattern and rel32-worker verification.",
+                static_cast<unsigned long long>(
+                    g_enhancedV100.owner - reinterpret_cast<uintptr_t>(imageBase)),
+                static_cast<unsigned long long>(
+                    g_enhancedV100.groupLoop - reinterpret_cast<uintptr_t>(imageBase)),
+                static_cast<unsigned long long>(
+                    g_enhancedV100.workerCallsite - reinterpret_cast<uintptr_t>(imageBase)),
+                static_cast<unsigned long long>(
+                    g_enhancedV100.worker - reinterpret_cast<uintptr_t>(imageBase)),
+                g_enhancedV100.ownerCallsToGroupLoop);
+        }
     }
 
     HMODULE exe =
@@ -7649,24 +7756,18 @@ static void InstallV52C26F00SourceIteratorCallerProbeAtModuleLoad()
             return;
         }
 
-        static const uint8_t expectedPrefix[16] =
-        {
-            0x41, 0x57,
-            0x41, 0x56,
-            0x41, 0x55,
-            0x41, 0x54,
-            0x56,
-            0x57,
-            0x55,
-            0x53,
-            0x48, 0x83, 0xEC, 0x48
-        };
-
-        if (memcmp(
+        uint8_t* targetStart = nullptr;
+        uint8_t* targetEnd = nullptr;
+        if (!FindRuntimeFunctionBounds(
+                base,
+                reinterpret_cast<uint8_t*>(imageEnd),
                 target,
-                expectedPrefix,
-                sizeof(expectedPrefix))
-            != 0)
+                targetStart,
+                targetEnd)
+            || targetStart != target
+            || !EnhancedV112MatchesGroupLoopEntry(
+                targetStart,
+                targetEnd))
         {
             g_v52C26F00FailureCode = 5;
             return;
@@ -29000,7 +29101,7 @@ static void RunDiagnostics(const char* reason)
     DumpUpstreamContentFunctionCallXrefs1012(base, end);
     DumpVerifiedMapStateChildGroupTables1012(base, end);
     DumpChildTableFieldWriteCandidates1012(base, end);
-    Logf("[Diag] v79 Enhanced late-replay success criteria with BOTH XML files STOCK: naturalSuppressed=1; frozen v55 early descriptor counters remain injected=0/sourceStoryBenny=0; pre-replay Benny unavailable; late descriptor write+restore verified; original C26F00 call completes; C272 Lowriders count grows by one; C27931 GROUP_MAP+Benny grows by one; final child has exactly one normalized GROUP_MAP+Benny and no GROUP_MAP_SP+Benny; Benny becomes available. v78 remains telemetry-only.");
+    Logf("[Diag] v111 Enhanced deferred-replay success criteria with BOTH XML files STOCK: naturalSuppressed=1; pre-replay Benny unavailable; temporary descriptor write+restore verified; original C26F00 call completes; final child has exactly one normalized GROUP_MAP+Benny and no GROUP_MAP_SP+Benny; Benny becomes available. Retired downstream telemetry counters are observational only. Legacy uses its own edition-specific deferred construction path.");
     DumpScriptHookVNativeMapHints();
 
     uint8_t* setup2String = FindAsciiFirstInRange(base, end, "setup2.xml");
@@ -29726,6 +29827,267 @@ static void LogBennysMapState(const char* prefix, const BennysMapState& state)
     }
 }
 
+static bool IsGameplayReadyForLateGameMapRefresh()
+{
+    return PLAYER::IS_PLAYER_PLAYING(PLAYER::PLAYER_ID());
+}
+
+static bool IsBennysReadyForCurrentEdition(const BennysMapState& state)
+{
+    return IsOlderLegacyLowridersBuild()
+        ? IsBennysMapReadyForOlderLegacy(state)
+        : IsBennysMapAvailable(state);
+}
+
+static void RequestBennysLowriderIplsLateGameOnce(ULONGLONG now)
+{
+    if (g_lateGameMapRefreshAttempted)
+        return;
+
+    g_lateGameMapRefreshAttempted = true;
+    g_lateGameMapRefreshRequestedAt = now;
+
+    BennysMapState before = CaptureBennysMapState();
+    LogBennysMapState(
+        "[LateMapDeferredReplay] BEFORE one-shot deferred Enhanced construction.",
+        before);
+
+    if (IsEnhancedExecutableImage()
+        && kExperimentalEnhancedLateRefreshIsolation
+        && kExperimentalEnhancedDeferredReplay
+        && !g_experimentalEnhancedDeferredReplayAttempted)
+    {
+        g_experimentalEnhancedDeferredReplayAttempted = true;
+
+        Logf(
+            "[LateMapDeferredReplay] BEGIN: startup V100 mutation was suppressed. Replaying the verified original C26F00 once now, after stable gameplay, with a temporary GROUP_MAP_SP -> Benny descriptor.");
+
+        g_experimentalEnhancedDeferredReplayStrictSuccess =
+            RunV79EnhancedLateC26F00Replay();
+
+        BennysMapState afterReplay = CaptureBennysMapState();
+        LogBennysMapState(
+            g_experimentalEnhancedDeferredReplayStrictSuccess
+                ? "[LateMapDeferredReplay] STRICT SUCCESS: deferred Rockstar construction replay made Benny's available."
+                : "[LateMapDeferredReplay] Replay completed without strict success; checking whether it registered enough state for targeted IPL streaming.",
+            afterReplay);
+
+        Logf(
+            "[LateMapDeferredReplay] END strictSuccess=%s callCompleted=%s descriptorWrite=%s descriptorRestored=%s finalMapBennyPairs=%u finalStoryBennyPairs=%u available=%s.",
+            g_experimentalEnhancedDeferredReplayStrictSuccess ? "yes" : "no",
+            g_v79LateReplayCallCompleted ? "yes" : "no",
+            g_v79LateReplayDescriptorWriteComplete ? "yes" : "no",
+            g_v79LateReplayDescriptorRestored ? "yes" : "no",
+            g_v79LateReplayFinalMapBennyPairs,
+            g_v79LateReplayFinalStoryBennyPairs,
+            IsBennysReadyForCurrentEdition(afterReplay) ? "yes" : "no");
+
+        if (g_experimentalEnhancedDeferredReplayStrictSuccess
+            && IsBennysReadyForCurrentEdition(afterReplay))
+        {
+            Logf(
+                "[LateMapDeferredReplay] Benny's is available and all v111 safety criteria passed after the deferred construction replay; no REQUEST_IPL fallback is needed.");
+            return;
+        }
+
+        if (IsBennysReadyForCurrentEdition(afterReplay))
+        {
+            Logf(
+                "[LateMapDeferredReplay] WARNING: Benny's became visible but the deferred replay failed a structural/restoration safety criterion. The map will not be accepted as a successful v111 load.");
+            return;
+        }
+
+        Logf(
+            "[LateMapDeferredReplay] Deferred Rockstar construction replay did not make Benny's available. v111 intentionally skips the redundant Enhanced REQUEST_IPL fallback proven ineffective by the v109 isolation test; passive probing will continue until the settle deadline.");
+        return;
+    }
+
+    Logf(
+        "[LateMapRefresh] Requesting Benny's seven known Lowriders IPLs exactly once after %lu ms of stable gameplay. No IPL removal, whole GROUP_MAP reload, ON_ENTER_SP/MP call, or per-frame re-request is performed.",
+        static_cast<unsigned long>(g_lateGameMapRefreshDelayMs));
+
+    g_lateGameMapRefreshIplsRequested = true;
+
+    for (size_t i = 0;
+         i < sizeof(kBennysLowriderIpls) / sizeof(kBennysLowriderIpls[0]);
+         ++i)
+    {
+        Logf(
+            "[LateMapRefresh] REQUEST_IPL #%u -> %s",
+            static_cast<unsigned int>(i + 1),
+            kBennysLowriderIpls[i]);
+        STREAMING::REQUEST_IPL((char*)kBennysLowriderIpls[i]);
+    }
+}
+
+static void UpdateLateGameBennysMapRefresh(
+    bool& loaded,
+    ULONGLONG now)
+{
+    if (!g_lateGameMapRefreshEnabled || loaded)
+        return;
+
+    if (!g_lateGameMapRefreshAttempted)
+    {
+        if (!IsGameplayReadyForLateGameMapRefresh())
+        {
+            g_lateGameMapRefreshGameplayReadySince = 0;
+            return;
+        }
+
+        if (g_lateGameMapRefreshGameplayReadySince == 0)
+        {
+            g_lateGameMapRefreshGameplayReadySince = now;
+            Logf(
+                "[DeferredConstruction] Gameplay is active. Holding for %lu ms before the one-shot Benny construction pass so normal save/world streaming can settle first.",
+                static_cast<unsigned long>(g_lateGameMapRefreshDelayMs));
+            return;
+        }
+
+        if (now - g_lateGameMapRefreshGameplayReadySince
+            < static_cast<ULONGLONG>(g_lateGameMapRefreshDelayMs))
+        {
+            return;
+        }
+
+        BennysMapState state = CaptureBennysMapState();
+        if (IsBennysReadyForCurrentEdition(state))
+        {
+            loaded = true;
+            ActivateBennysInterior(state);
+            LogBennysMapState(
+                "[DeferredConstruction] Benny's became available naturally before the deferred construction pass; no replay was needed.",
+                state);
+
+            if (!g_productionLogFinalized)
+                FinalizeProductionSuccessLog(IsEnhancedExecutableImage());
+            return;
+        }
+
+        if (IsLegacyExecutableImage()
+            && kExperimentalCrossEditionDeferredConstruction
+            && !g_experimentalLegacyDeferredConstructionAttempted)
+        {
+            g_lateGameMapRefreshAttempted = true;
+            g_lateGameMapRefreshRequestedAt = now;
+            g_experimentalLegacyDeferredConstructionAttempted = true;
+
+            LogBennysMapState(
+                "[LegacyDeferredConstruction] BEFORE one-shot deferred Legacy construction.",
+                state);
+            Logf(
+                "[LegacyDeferredConstruction] BEGIN: gameplay is stable. Running the cross-build Legacy locator first. A dynamically located construction owner/callsite/mutator is used when the verified layout matches; older Legacy retains its IPL compatibility fallback and known build 102 retains v92/v77 only as a pre-mutation fallback.");
+
+            g_experimentalLegacyDeferredConstructionExecuting = true;
+            const bool legacyImmediateLoaded =
+                TryLoadBennysMap(false);
+            g_experimentalLegacyDeferredConstructionExecuting = false;
+
+            BennysMapState afterLegacy = CaptureBennysMapState();
+            const bool legacyReady =
+                IsBennysReadyForCurrentEdition(afterLegacy);
+
+            LogBennysMapState(
+                legacyReady
+                    ? "[LegacyDeferredConstruction] SUCCESS: deferred Legacy construction made Benny's available."
+                    : "[LegacyDeferredConstruction] Deferred Legacy construction returned; Benny's is not fully ready yet, so existing passive/retry handling will continue.",
+                afterLegacy);
+            Logf(
+                "[LegacyDeferredConstruction] END immediateLoaded=%s readyNow=%s build=%d olderUniversalCommitted=%s build102Committed=%s retrySafe=%s.",
+                legacyImmediateLoaded ? "yes" : "no",
+                legacyReady ? "yes" : "no",
+                getGameVersion(),
+                IsLegacyV98OlderMutationCommittedForDeferredConstruction() ? "yes" : "no",
+                IsLegacyV87ConstructionCommittedForDeferredConstruction() ? "yes" : "no",
+                IsLegacyV87RetrySafeForDeferredConstruction() ? "yes" : "no");
+
+            if (legacyReady)
+            {
+                loaded = true;
+                ActivateBennysInterior(afterLegacy);
+                g_lateGameMapRefreshSettledLogged = true;
+                if (!g_productionLogFinalized)
+                    FinalizeProductionSuccessLog(false);
+            }
+            return;
+        }
+
+        RequestBennysLowriderIplsLateGameOnce(now);
+        return;
+    }
+
+    if (g_lateGameMapRefreshSettledLogged
+        || g_lateGameMapRefreshRequestedAt == 0
+        || now - g_lateGameMapRefreshRequestedAt
+            < static_cast<ULONGLONG>(g_lateGameMapRefreshSettleMs))
+    {
+        return;
+    }
+
+    g_lateGameMapRefreshSettledLogged = true;
+
+    BennysMapState state = CaptureBennysMapState();
+    if (IsEnhancedExecutableImage()
+        && g_experimentalEnhancedDeferredReplayAttempted
+        && !g_experimentalEnhancedDeferredReplayStrictSuccess
+        && IsBennysReadyForCurrentEdition(state))
+    {
+        LogBennysMapState(
+            "[LateMapDeferredReplay] REFUSED: Benny's is visible after replay, but v111 structural/restoration success criteria did not pass.",
+            state);
+        if (!g_productionLogFinalized)
+        {
+            FinalizeProductionFailureLog(
+                true,
+                "Deferred Enhanced replay exposed Benny's but failed v111 structural/restoration safety validation.");
+        }
+        return;
+    }
+
+    if (IsBennysReadyForCurrentEdition(state))
+    {
+        loaded = true;
+        ActivateBennysInterior(state);
+        const char* successLabel =
+            IsLegacyExecutableImage()
+                ? "[LegacyDeferredConstruction] SUCCESS: Benny's became available after the deferred Legacy construction pass."
+                : (g_lateGameMapRefreshIplsRequested
+                    ? "[LateMapRefresh] SUCCESS: Benny's became available after the deferred replay + one-shot in-game IPL refresh."
+                    : "[LateMapDeferredReplay] SUCCESS: Benny's became available after the deferred Rockstar construction replay; no IPL request was required.");
+        LogBennysMapState(successLabel, state);
+
+        if (!g_productionLogFinalized)
+            FinalizeProductionSuccessLog(IsEnhancedExecutableImage());
+        return;
+    }
+
+    LogBennysMapState(
+        IsLegacyExecutableImage()
+            ? "[LegacyDeferredConstruction] RESULT: deferred Legacy construction settled without making Benny's available. Existing committed-state/passive/retry handling will continue where safe."
+            : "[LateMapDeferredReplay] RESULT: deferred Enhanced C26F00 replay settled without making Benny's available. Passive probing will continue; no redundant IPL request will occur.",
+        state);
+
+    if (IsEnhancedExecutableImage()
+        && kExperimentalEnhancedLateRefreshIsolation
+        && !g_productionLogFinalized)
+    {
+        FinalizeProductionFailureLog(
+            true,
+            "Experimental Enhanced deferred C26F00 replay settled without making Benny's available.");
+    }
+    else if (IsLegacyExecutableImage()
+        && kExperimentalCrossEditionDeferredConstruction
+        && !g_productionLogFinalized
+        && !IsLegacyV87RetrySafeForDeferredConstruction()
+        && !IsLegacyV87ConstructionCommittedForDeferredConstruction()
+        && !IsLegacyV98OlderMutationCommittedForDeferredConstruction())
+    {
+        FinalizeProductionFailureLog(
+            false,
+            "Experimental deferred Legacy construction reached a terminal state without making Benny's available.");
+    }
+}
+
 static const char* GetV79LateReplayFailureReason()
 {
     switch (g_v79LateReplayFailureCode)
@@ -29740,7 +30102,7 @@ static const char* GetV79LateReplayFailureReason()
     case 7:  return "descriptor-write-fault-or-verify-failed";
     case 8:  return "C26F00-call-faulted";
     case 9:  return "descriptor-restore-failed";
-    case 10: return "downstream-Benny-not-produced";
+    case 10: return "final-Benny-association-invalid";
     case 11: return "Benny-unavailable-after-replay";
     case 12: return "seh-exception";
     default: return "unknown";
@@ -29755,7 +30117,7 @@ static void LogV79LateReplayState(const char* phase)
     Logf(
         "[EnhancedLateReplayV79] %s enabled=%s naturalSuppressed=%ld state=%ld failure=%lu(%s) mapState=%p child=%p descriptor{table=%p count=%u->%u writeComplete=%s restored=%s} call{completed=%s faulted=%s result=%p} downstream{C272=%ld->%ld mapBenny=%ld->%ld} finalPairs{GROUP_MAP+Benny=%u GROUP_MAP_SP+Benny=%u} available=%s->%s.",
         phase ? phase : "state",
-        g_v79EnhancedLateReplayExperiment ? "yes" : "no",
+        (g_v79EnhancedLateReplayExperiment || kExperimentalEnhancedDeferredReplay) ? "yes" : "no",
         static_cast<long>(g_v79NaturalInjectionSuppressedHits),
         static_cast<long>(InterlockedCompareExchange(&g_v79LateReplayState, 0, 0)),
         static_cast<unsigned long>(g_v79LateReplayFailureCode),
@@ -29785,7 +30147,8 @@ static bool RunV79EnhancedLateC26F00Replay()
 
 #pragma warning(suppress: 6236)
     if (!IsEnhancedExecutableImage()
-        || !g_v79EnhancedLateReplayExperiment)
+        || (!g_v79EnhancedLateReplayExperiment
+            && !kExperimentalEnhancedDeferredReplay))
     {
         return false;
     }
@@ -30193,11 +30556,14 @@ static bool RunV79EnhancedLateC26F00Replay()
         "[EnhancedLateReplayV79] post-replay state",
         afterState);
 
+    // v110 proved the old downstream telemetry counters are not authoritative
+    // for a deferred replay: the Rockstar call can successfully construct Benny
+    // while those retired instrumentation counters remain unchanged. Judge the
+    // replay by the call/restoration result and the actual final map state.
     if (g_v79LateReplayFailureCode == 0
         && (!g_v79LateReplayCallCompleted
-            || g_v79LateReplayMapBennyAfter
-                <= g_v79LateReplayMapBennyBefore
-            || g_v79LateReplayFinalMapBennyPairs == 0))
+            || g_v79LateReplayFinalMapBennyPairs != 1
+            || g_v79LateReplayFinalStoryBennyPairs != 0))
     {
         g_v79LateReplayFailureCode = 10;
     }
@@ -30214,8 +30580,6 @@ static bool RunV79EnhancedLateC26F00Replay()
         && g_v79LateReplayDescriptorRestored
         && g_v79LateReplayCallCompleted
         && !g_v79LateReplayCallFaulted
-        && g_v79LateReplayMapBennyAfter
-            > g_v79LateReplayMapBennyBefore
         && g_v79LateReplayFinalMapBennyPairs == 1
         && g_v79LateReplayFinalStoryBennyPairs == 0
         && g_v79LateReplayAvailableAfter;
@@ -34613,6 +34977,131 @@ static bool EnhancedV99LooksLikeAbsoluteJump12(
         && start[11] == 0xE0;
 }
 
+// v112 cross-build entry-pattern validator.  Do not key the Enhanced loader to
+// one RVA or one exact stack-allocation byte.  The hook still requires a safe,
+// relocation-free 16-byte prologue, but nonvolatile push order and stack size
+// may vary between executable builds.  A candidate must also survive the
+// owner -> groupLoop -> worker call-graph and live-layout semantic gates.
+static bool EnhancedV112MatchUniqueHighRegisterPushes(
+    const uint8_t* bytes,
+    size_t pairCount)
+{
+    if (!bytes || pairCount == 0 || pairCount > 4)
+        return false;
+
+    uint8_t seen = 0;
+    for (size_t i = 0; i < pairCount; ++i)
+    {
+        const uint8_t* p = bytes + (i * 2);
+        if (p[0] != 0x41 || p[1] < 0x54 || p[1] > 0x57)
+            return false;
+
+        const uint8_t bit =
+            static_cast<uint8_t>(1U << (p[1] - 0x54));
+        if ((seen & bit) != 0)
+            return false;
+        seen = static_cast<uint8_t>(seen | bit);
+    }
+
+    return true;
+}
+
+static bool EnhancedV112MatchUniqueLowRegisterPushes(
+    const uint8_t* bytes,
+    size_t count)
+{
+    if (!bytes || count == 0 || count > 4)
+        return false;
+
+    uint8_t seen = 0;
+    for (size_t i = 0; i < count; ++i)
+    {
+        const uint8_t op = bytes[i];
+        uint8_t bit = 0;
+        switch (op)
+        {
+        case 0x53: bit = 0x01; break; // RBX
+        case 0x55: bit = 0x02; break; // RBP
+        case 0x56: bit = 0x04; break; // RSI
+        case 0x57: bit = 0x08; break; // RDI
+        default: return false;
+        }
+
+        if ((seen & bit) != 0)
+            return false;
+        seen = static_cast<uint8_t>(seen | bit);
+    }
+
+    return true;
+}
+
+static bool EnhancedV112MatchStackSubtractImm8(
+    const uint8_t* bytes)
+{
+    if (!bytes
+        || bytes[0] != 0x48
+        || bytes[1] != 0x83
+        || bytes[2] != 0xEC)
+    {
+        return false;
+    }
+
+    const uint8_t amount = bytes[3];
+    return amount >= 0x20
+        && amount <= 0x78
+        && (amount & 0x07U) == 0;
+}
+
+static bool EnhancedV112MatchesGroupLoopEntry(
+    uint8_t* start,
+    uint8_t* finish)
+{
+    if (!start
+        || !finish
+        || finish <= start
+        || static_cast<size_t>(finish - start) < 16)
+    {
+        return false;
+    }
+
+    return EnhancedV112MatchUniqueHighRegisterPushes(start, 4)
+        && EnhancedV112MatchUniqueLowRegisterPushes(start + 8, 4)
+        && EnhancedV112MatchStackSubtractImm8(start + 12);
+}
+
+static bool EnhancedV112MatchesWorkerEntry(
+    uint8_t* start,
+    uint8_t* finish)
+{
+    if (!start
+        || !finish
+        || finish <= start
+        || static_cast<size_t>(finish - start) < 14)
+    {
+        return false;
+    }
+
+    if (!EnhancedV112MatchUniqueHighRegisterPushes(start, 3)
+        || !EnhancedV112MatchUniqueLowRegisterPushes(start + 6, 4)
+        || !EnhancedV112MatchStackSubtractImm8(start + 10))
+    {
+        return false;
+    }
+
+    // The verified Lowriders worker preserves R12/R14/R15 and not R13.
+    // Keep the order flexible for cross-build compiler changes, but require
+    // the same register set so generic worker-shaped functions do not qualify.
+    uint8_t highSet = 0;
+    for (size_t i = 0; i < 3; ++i)
+    {
+        const uint8_t op = start[(i * 2) + 1];
+        highSet = static_cast<uint8_t>(
+            highSet | (1U << (op - 0x54U)));
+    }
+
+    return highSet == 0x0DU; // R12 + R14 + R15
+}
+
 static uint32_t EnhancedV99CountDirectCallsToTarget(
     uint8_t* base,
     uint8_t* end,
@@ -34648,12 +35137,16 @@ static uint32_t EnhancedV99CountDirectCallsToTarget(
     return matches;
 }
 
-static bool DiscoverEnhancedV99StructuralChain(
+static bool DiscoverEnhancedV113StrictConstructionChain(
     uint8_t* base,
     uint8_t* end,
     const RUNTIME_FUNCTION* table,
     size_t tableCount)
 {
+    // Tier 1 is the known-good instruction profile from the working v111b path.
+    // It contains no RVA: the functions are still discovered by .pdata +
+    // rel32 call topology. Keeping this profile first prevents generic compiler
+    // prologues elsewhere in GTA from competing with the Lowriders chain.
     static const uint8_t groupLoopPrefix[16] =
     {
         0x41, 0x57,
@@ -34679,6 +35172,213 @@ static bool DiscoverEnhancedV99StructuralChain(
         0x48, 0x83, 0xEC, 0x30
     };
 
+    struct StrictCandidate
+    {
+        uintptr_t groupLoop;
+        uintptr_t workerCallsite;
+        uintptr_t worker;
+        uintptr_t owner;
+        uint32_t ownerCandidates;
+        uint32_t ownerCalls;
+    };
+
+    std::vector<StrictCandidate> candidates;
+    candidates.reserve(16);
+
+    for (size_t i = 0; i < tableCount; ++i)
+    {
+        const RUNTIME_FUNCTION& rf = table[i];
+        if (rf.BeginAddress >= rf.EndAddress
+            || rf.EndAddress > static_cast<uint32_t>(end - base))
+        {
+            continue;
+        }
+
+        uint8_t* groupLoop = base + rf.BeginAddress;
+        uint8_t* groupLoopEnd = base + rf.EndAddress;
+        if (!EnhancedV99PrefixEquals(
+                groupLoop,
+                groupLoopEnd,
+                groupLoopPrefix,
+                sizeof(groupLoopPrefix)))
+        {
+            continue;
+        }
+
+        for (uint8_t* p = groupLoop; p + 5 <= groupLoopEnd; ++p)
+        {
+            if (p[0] != 0xE8)
+                continue;
+
+            uint8_t* worker = nullptr;
+            if (!ResolveLegacyV86Rel32Call(base, end, p, worker))
+                continue;
+
+            uint8_t* workerStart = nullptr;
+            uint8_t* workerEnd = nullptr;
+            if (!FindRuntimeFunctionBounds(
+                    base,
+                    end,
+                    worker,
+                    workerStart,
+                    workerEnd)
+                || workerStart != worker
+                || !EnhancedV99PrefixEquals(
+                    workerStart,
+                    workerEnd,
+                    workerPrefix,
+                    sizeof(workerPrefix)))
+            {
+                continue;
+            }
+
+            if (EnhancedV99CountDirectCallsToTarget(
+                    base,
+                    end,
+                    groupLoop,
+                    groupLoopEnd,
+                    worker,
+                    nullptr,
+                    0) != 1)
+            {
+                continue;
+            }
+
+            StrictCandidate c{};
+            c.groupLoop = reinterpret_cast<uintptr_t>(groupLoop);
+            c.workerCallsite = reinterpret_cast<uintptr_t>(p);
+            c.worker = reinterpret_cast<uintptr_t>(worker);
+            candidates.push_back(c);
+        }
+    }
+
+    if (candidates.empty())
+    {
+        Logf(
+            "[CrossBuildLocator] Enhanced Tier-1 strict instruction profile found no groupLoop/worker chain; Tier-2 relaxed semantic discovery will be attempted.");
+        return false;
+    }
+
+    std::vector<uint32_t> callsPerCandidate(candidates.size(), 0U);
+
+    for (size_t i = 0; i < tableCount; ++i)
+    {
+        const RUNTIME_FUNCTION& rf = table[i];
+        if (rf.BeginAddress >= rf.EndAddress
+            || rf.EndAddress > static_cast<uint32_t>(end - base))
+        {
+            continue;
+        }
+
+        for (size_t c = 0; c < callsPerCandidate.size(); ++c)
+            callsPerCandidate[c] = 0U;
+
+        uint8_t* ownerStart = base + rf.BeginAddress;
+        uint8_t* ownerEnd = base + rf.EndAddress;
+
+        for (uint8_t* p = ownerStart; p + 5 <= ownerEnd; ++p)
+        {
+            if (p[0] != 0xE8)
+                continue;
+
+            uint8_t* target = nullptr;
+            if (!ResolveLegacyV86Rel32Call(base, end, p, target))
+                continue;
+
+            const uintptr_t targetAddress =
+                reinterpret_cast<uintptr_t>(target);
+            for (size_t c = 0; c < candidates.size(); ++c)
+            {
+                if (targetAddress == candidates[c].groupLoop)
+                    ++callsPerCandidate[c];
+            }
+        }
+
+        for (size_t c = 0; c < candidates.size(); ++c)
+        {
+            if (callsPerCandidate[c] != 3)
+                continue;
+
+            StrictCandidate& candidate = candidates[c];
+            ++candidate.ownerCandidates;
+            if (candidate.ownerCandidates == 1)
+            {
+                candidate.owner =
+                    reinterpret_cast<uintptr_t>(ownerStart);
+                candidate.ownerCalls = callsPerCandidate[c];
+            }
+        }
+    }
+
+    uint32_t qualified = 0;
+    StrictCandidate selected{};
+
+    for (const StrictCandidate& candidate : candidates)
+    {
+        if (candidate.ownerCandidates != 1
+            || !candidate.owner
+            || candidate.ownerCalls != 3)
+        {
+            continue;
+        }
+
+        ++qualified;
+        if (qualified == 1)
+            selected = candidate;
+    }
+
+    Logf(
+        "[CrossBuildLocator] Enhanced Tier-1 strict profile rawChains=%u qualifiedChains=%u.",
+        static_cast<unsigned int>(candidates.size()),
+        qualified);
+
+    if (qualified != 1)
+    {
+        Logf(
+            "[CrossBuildLocator] Enhanced Tier-1 did not resolve uniquely; Tier-2 relaxed semantic discovery will be attempted.");
+        return false;
+    }
+
+    g_enhancedV99.groupLoopCandidates = 1;
+    g_enhancedV99.ownerCandidates = 1;
+    g_enhancedV99.groupLoop = selected.groupLoop;
+    g_enhancedV99.workerCallsite = selected.workerCallsite;
+    g_enhancedV99.worker = selected.worker;
+    g_enhancedV99.owner = selected.owner;
+    g_enhancedV99.ownerCallsToGroupLoop = selected.ownerCalls;
+    g_enhancedV99.ownerResolved = true;
+    g_enhancedV99.structuralResolved = true;
+
+    Logf(
+        "[CrossBuildLocator] Enhanced Tier-1 UNIQUE construction chain resolved ownerRVA=0x%llX groupLoopRVA=0x%llX workerCallRVA=0x%llX workerRVA=0x%llX ownerCalls=%u. No fixed RVA was used for selection.",
+        static_cast<unsigned long long>(
+            selected.owner - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selected.groupLoop - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selected.workerCallsite - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selected.worker - reinterpret_cast<uintptr_t>(base)),
+        selected.ownerCalls);
+
+    return true;
+}
+
+static bool DiscoverEnhancedV99StructuralChain(
+    uint8_t* base,
+    uint8_t* end,
+    const RUNTIME_FUNCTION* table,
+    size_t tableCount)
+{
+    if (DiscoverEnhancedV113StrictConstructionChain(
+            base,
+            end,
+            table,
+            tableCount))
+    {
+        return true;
+    }
+
     struct ChainCandidate
     {
         uintptr_t groupLoop;
@@ -34691,10 +35391,15 @@ static bool DiscoverEnhancedV99StructuralChain(
         bool workerDetoured;
     };
 
-    constexpr uint32_t maxChainCandidates = 64;
-    ChainCandidate chains[maxChainCandidates]{};
+    // v112b: do not truncate semantic candidates before call-graph qualification.
+    // v112 kept only the first 64 broad entry-shape matches; the known-good
+    // Enhanced chain could therefore be discarded before its owner topology was
+    // checked. Keep all reasonable candidates, then fail closed if discovery is
+    // pathological rather than guessing which early match is correct.
+    constexpr uint32_t maxRawChainCandidates = 4096;
+    std::vector<ChainCandidate> chains;
+    chains.reserve(512);
     uint32_t rawChainCandidates = 0;
-    uint32_t storedChainCandidates = 0;
 
     for (size_t i = 0; i < tableCount; ++i)
     {
@@ -34708,11 +35413,9 @@ static bool DiscoverEnhancedV99StructuralChain(
         uint8_t* candidate = base + rf.BeginAddress;
         uint8_t* candidateEnd = base + rf.EndAddress;
         const bool naturalGroupLoop =
-            EnhancedV99PrefixEquals(
+            EnhancedV112MatchesGroupLoopEntry(
                 candidate,
-                candidateEnd,
-                groupLoopPrefix,
-                sizeof(groupLoopPrefix));
+                candidateEnd);
         const bool detouredGroupLoop =
             !naturalGroupLoop
             && EnhancedV99LooksLikeAbsoluteJump12(
@@ -34744,11 +35447,9 @@ static bool DiscoverEnhancedV99StructuralChain(
             }
 
             const bool naturalWorker =
-                EnhancedV99PrefixEquals(
+                EnhancedV112MatchesWorkerEntry(
                     targetStart,
-                    targetEnd,
-                    workerPrefix,
-                    sizeof(workerPrefix));
+                    targetEnd);
             const bool detouredWorker =
                 !naturalWorker
                 && EnhancedV99LooksLikeAbsoluteJump12(
@@ -34770,11 +35471,16 @@ static bool DiscoverEnhancedV99StructuralChain(
                 continue;
 
             ++rawChainCandidates;
-            if (storedChainCandidates >= maxChainCandidates)
-                continue;
+            if (rawChainCandidates > maxRawChainCandidates)
+            {
+                Logf(
+                    "[UniversalEnhancedV99] structuralFilter rawChains>%u; semantic entry matcher produced an implausible number of candidates. Failing closed before any hook or mutation.",
+                    maxRawChainCandidates);
+                g_enhancedV99.groupLoopCandidates = 0;
+                return false;
+            }
 
-            ChainCandidate& chain =
-                chains[storedChainCandidates++];
+            ChainCandidate chain{};
             chain.groupLoop =
                 reinterpret_cast<uintptr_t>(candidate);
             chain.workerCallsite =
@@ -34783,21 +35489,22 @@ static bool DiscoverEnhancedV99StructuralChain(
                 reinterpret_cast<uintptr_t>(target);
             chain.groupLoopDetoured = detouredGroupLoop;
             chain.workerDetoured = detouredWorker;
+            chains.push_back(chain);
         }
     }
 
-    if (rawChainCandidates == 0
-        || rawChainCandidates > maxChainCandidates
-        || storedChainCandidates != rawChainCandidates)
+    if (chains.empty())
     {
         Logf(
-            "[UniversalEnhancedV99] structuralFilter rawChains=%u storedChains=%u overflow=%s qualifiedChains=0.",
-            rawChainCandidates,
-            storedChainCandidates,
-            rawChainCandidates > maxChainCandidates ? "yes" : "no");
+            "[UniversalEnhancedV99] structuralFilter rawChains=0 storedChains=0 overflow=no qualifiedChains=0.");
         g_enhancedV99.groupLoopCandidates = 0;
         return false;
     }
+
+    // Qualify every broad candidate by its owner topology. This is intentionally
+    // one-shot startup work; nothing here runs per frame. Reuse one counter vector
+    // to avoid thousands of small allocations while enumerating runtime functions.
+    std::vector<uint32_t> callsPerChain(chains.size(), 0U);
 
     for (size_t i = 0; i < tableCount; ++i)
     {
@@ -34808,9 +35515,11 @@ static bool DiscoverEnhancedV99StructuralChain(
             continue;
         }
 
+        for (size_t c = 0; c < callsPerChain.size(); ++c)
+            callsPerChain[c] = 0U;
+
         uint8_t* ownerStart = base + rf.BeginAddress;
         uint8_t* ownerEnd = base + rf.EndAddress;
-        uint32_t callsPerChain[maxChainCandidates]{};
 
         for (uint8_t* p = ownerStart; p + 5 <= ownerEnd; ++p)
         {
@@ -34823,15 +35532,18 @@ static bool DiscoverEnhancedV99StructuralChain(
 
             const uintptr_t targetAddress =
                 reinterpret_cast<uintptr_t>(target);
-            for (uint32_t c = 0; c < storedChainCandidates; ++c)
+            for (size_t c = 0; c < chains.size(); ++c)
             {
                 if (targetAddress == chains[c].groupLoop)
                     ++callsPerChain[c];
             }
         }
 
-        for (uint32_t c = 0; c < storedChainCandidates; ++c)
+        for (size_t c = 0; c < chains.size(); ++c)
         {
+            // The exact number of owner setup passes may shift between builds.
+            // Keep a narrow range and require a single owner + single chain;
+            // ambiguity fails closed and no patch is installed.
             if (callsPerChain[c] != 3)
                 continue;
 
@@ -34853,15 +35565,23 @@ static bool DiscoverEnhancedV99StructuralChain(
     uintptr_t selectedOwner = 0;
     uint32_t selectedOwnerCandidates = 0;
     uint32_t selectedOwnerCalls = 0;
-
-    for (uint32_t c = 0; c < storedChainCandidates; ++c)
+    for (size_t c = 0; c < chains.size(); ++c)
     {
         const ChainCandidate& chain = chains[c];
-        if (c < 16)
+        const bool qualifies =
+            chain.ownerCandidates == 1
+            && chain.owner
+            && chain.ownerCalls == 3
+            && chain.workerCallsite >= chain.groupLoop
+            && (chain.workerCallsite - chain.groupLoop) <= 0x180ULL;
+
+        // Log all actually-qualified chains plus a bounded sample of early broad
+        // matches. This keeps diagnostics useful without dumping hundreds of rows.
+        if (qualifies || c < 12)
         {
             Logf(
                 "[UniversalEnhancedV99] chainCandidate ordinal=%u groupLoopRVA=0x%llX workerCallRVA=0x%llX workerRVA=0x%llX entry{%s,%s} ownerCandidates=%u ownerRVA=0x%llX ownerCalls=%u qualifies=%s.",
-                c + 1,
+                static_cast<unsigned int>(c + 1),
                 static_cast<unsigned long long>(
                     chain.groupLoop
                     - reinterpret_cast<uintptr_t>(base)),
@@ -34880,15 +35600,12 @@ static bool DiscoverEnhancedV99StructuralChain(
                         - reinterpret_cast<uintptr_t>(base))
                     : 0ULL,
                 chain.ownerCalls,
-                chain.ownerCandidates == 1 ? "yes" : "no");
+                qualifies ? "yes" : "no");
+
         }
 
-        if (chain.ownerCandidates != 1
-            || !chain.owner
-            || chain.ownerCalls != 3)
-        {
+        if (!qualifies)
             continue;
-        }
 
         ++qualifiedChains;
         if (qualifiedChains == 1)
@@ -34902,10 +35619,11 @@ static bool DiscoverEnhancedV99StructuralChain(
         }
     }
 
+
     Logf(
         "[UniversalEnhancedV99] structuralFilter rawChains=%u storedChains=%u overflow=no qualifiedChains=%u.",
         rawChainCandidates,
-        storedChainCandidates,
+        static_cast<unsigned int>(chains.size()),
         qualifiedChains);
 
     g_enhancedV99.groupLoopCandidates = qualifiedChains;
@@ -34917,7 +35635,9 @@ static bool DiscoverEnhancedV99StructuralChain(
         || !selectedWorker
         || !selectedOwner
         || selectedOwnerCandidates != 1
-        || selectedOwnerCalls != 3)
+        || selectedOwnerCalls != 3
+        || selectedWorkerCallsite < selectedGroupLoop
+        || (selectedWorkerCallsite - selectedGroupLoop) > 0x180ULL)
     {
         return false;
     }
@@ -34929,6 +35649,19 @@ static bool DiscoverEnhancedV99StructuralChain(
     g_enhancedV99.ownerCallsToGroupLoop = selectedOwnerCalls;
     g_enhancedV99.ownerResolved = true;
     g_enhancedV99.structuralResolved = true;
+
+    Logf(
+        "[CrossBuildLocator] Enhanced unique construction chain resolved ownerRVA=0x%llX groupLoopRVA=0x%llX workerCallRVA=0x%llX workerRVA=0x%llX ownerCalls=%u from %u semantic candidates.",
+        static_cast<unsigned long long>(
+            selectedOwner - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selectedGroupLoop - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selectedWorkerCallsite - reinterpret_cast<uintptr_t>(base)),
+        static_cast<unsigned long long>(
+            selectedWorker - reinterpret_cast<uintptr_t>(base)),
+        selectedOwnerCalls,
+        rawChainCandidates);
     return true;
 }
 
@@ -35657,6 +36390,8 @@ static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad()
 
     g_enhancedV100.structuralChains =
         g_enhancedV99.groupLoopCandidates;
+    g_enhancedV100.ownerCallsToGroupLoop =
+        g_enhancedV99.ownerCallsToGroupLoop;
     g_enhancedV100.owner =
         g_enhancedV99.owner;
     g_enhancedV100.groupLoop =
@@ -35676,6 +36411,8 @@ static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad()
         || !g_enhancedV100.groupLoop
         || !g_enhancedV100.workerCallsite
         || !g_enhancedV100.worker
+        || g_enhancedV100.ownerCallsToGroupLoop < 2
+        || g_enhancedV100.ownerCallsToGroupLoop > 6
         || g_enhancedV100.bootstrapFaulted)
     {
         return false;
@@ -35706,24 +36443,9 @@ static bool ResolveEnhancedV100StructuralBootstrapAtModuleLoad()
         return false;
     }
 
-    static const uint8_t expectedGroupLoopPrefix[16] =
-    {
-        0x41, 0x57,
-        0x41, 0x56,
-        0x41, 0x55,
-        0x41, 0x54,
-        0x56,
-        0x57,
-        0x55,
-        0x53,
-        0x48, 0x83, 0xEC, 0x48
-    };
-
-    if (!EnhancedV99PrefixEquals(
+    if (!EnhancedV112MatchesGroupLoopEntry(
             groupLoopStart,
-            groupLoopEnd,
-            expectedGroupLoopPrefix,
-            sizeof(expectedGroupLoopPrefix)))
+            groupLoopEnd))
     {
         return false;
     }
@@ -36196,12 +36918,13 @@ static void LogEnhancedV100IntegrationState(
     };
 
     Logf(
-        "[EnhancedV100] %s bootstrap{attempted=%s ready=%s faulted=%s chains=%u owner=0x%llX groupLoop=0x%llX workerCall=0x%llX worker=0x%llX} liveGate{attempts=%ld passed=%ld rejected=%ld resolved=%s callsite=0x%llX context=%p child=%p} childLayout{candidates=%u arrayOff=0x%X countOff=0x%X stride=0x%X hashOff=0x%X array=%p count=%u index=%ld} descriptorLayout{candidates=%u vectorOff=0x%X countOff=0x%X capOff=0x%X stride=0x%X groupOff=0x%X assocOff=0x%X assocCountOff=0x%X table=%p count=%u mapDescriptors=%u storyDescriptors=%u mapBenny=%u storyBenny=%u} mutation{attempts=%ld injected=%ld alreadyPresent=%ld rejected=%ld writeFaults=%ld restoreAttempts=%ld restoreVerified=%ld restoreFailures=%ld}.",
+        "[EnhancedV100] %s bootstrap{attempted=%s ready=%s faulted=%s chains=%u ownerCalls=%u owner=0x%llX groupLoop=0x%llX workerCall=0x%llX worker=0x%llX} liveGate{attempts=%ld passed=%ld rejected=%ld resolved=%s callsite=0x%llX context=%p child=%p} childLayout{candidates=%u arrayOff=0x%X countOff=0x%X stride=0x%X hashOff=0x%X array=%p count=%u index=%ld} descriptorLayout{candidates=%u vectorOff=0x%X countOff=0x%X capOff=0x%X stride=0x%X groupOff=0x%X assocOff=0x%X assocCountOff=0x%X table=%p count=%u mapDescriptors=%u storyDescriptors=%u mapBenny=%u storyBenny=%u} mutation{attempts=%ld injected=%ld alreadyPresent=%ld rejected=%ld writeFaults=%ld restoreAttempts=%ld restoreVerified=%ld restoreFailures=%ld}.",
         phase ? phase : "",
         g_enhancedV100.bootstrapAttempted ? "yes" : "no",
         g_enhancedV100.bootstrapReady ? "yes" : "no",
         g_enhancedV100.bootstrapFaulted ? "yes" : "no",
         g_enhancedV100.structuralChains,
+        g_enhancedV100.ownerCallsToGroupLoop,
         rva(g_enhancedV100.owner),
         rva(g_enhancedV100.groupLoop),
         rva(g_enhancedV100.workerCallsite),
@@ -37924,6 +38647,21 @@ static bool IsLegacyV87ConstructionCommitted()
         && g_legacyV73.exactDerivedAfterConstruction;
 }
 
+static bool IsLegacyV98OlderMutationCommittedForDeferredConstruction()
+{
+    return g_legacyV98OlderMutationCommitted;
+}
+
+static bool IsLegacyV87ConstructionCommittedForDeferredConstruction()
+{
+    return IsLegacyV87ConstructionCommitted();
+}
+
+static bool IsLegacyV87RetrySafeForDeferredConstruction()
+{
+    return g_legacyV87RetrySafe;
+}
+
 static bool IsLegacyV87CachedStockOverlayReusable()
 {
     if (!g_legacyV73OverlayGate.scanned
@@ -38452,7 +39190,10 @@ static bool RunLegacyV73ConstructionPairReplay()
 
 static bool IsLegacyV98OlderMutationLayoutSafe()
 {
-    return IsOlderLegacyLowridersBuild()
+    const int gameVersion = getGameVersion();
+    return IsLegacyExecutableImage()
+        && gameVersion >= 12
+        && gameVersion < 1000
         && g_legacyV98.readyForMutationResearch
         && !g_legacyV98.faulted
         && g_legacyV98.contextCandidates == 1
@@ -38533,7 +39274,9 @@ static bool VerifyLegacyV98OlderConstructionOwnerAbi()
             ownerStart,
             ownerEnd)
         && ownerStart == owner
-        && ownerEnd > ownerStart;
+        && ownerEnd > ownerStart
+        && static_cast<size_t>(ownerEnd - ownerStart) >= 0x80
+        && static_cast<size_t>(ownerEnd - ownerStart) <= 0x1000;
 
     const bool mutatorBounds =
         mutator >= base
@@ -38580,29 +39323,46 @@ static bool VerifyLegacyV98OlderConstructionOwnerAbi()
     bool callShapeVerified = false;
     bool addTrueVerified = false;
     bool faulted = false;
+    uint8_t* argumentCaptureAt = nullptr;
+    uint8_t* descriptorGateAt = nullptr;
+    uint8_t* associatedReadAt = nullptr;
 
     __try
     {
-        argumentCaptureVerified =
-            owner + 0x28 <= ownerEnd
-            && memcmp(
-                owner + 0x1F,
-                argumentCapture,
-                sizeof(argumentCapture)) == 0;
+        uint8_t* semanticEnd = owner + 0x120;
+        if (semanticEnd > ownerEnd)
+            semanticEnd = ownerEnd;
 
-        descriptorGateVerified =
-            owner + 0x38 <= ownerEnd
-            && memcmp(
-                owner + 0x2D,
-                descriptorGate,
-                sizeof(descriptorGate)) == 0;
+        argumentCaptureAt = FindLegacyV86Bytes(
+            owner,
+            semanticEnd,
+            argumentCapture,
+            sizeof(argumentCapture));
+        descriptorGateAt = FindLegacyV86Bytes(
+            owner,
+            semanticEnd,
+            descriptorGate,
+            sizeof(descriptorGate));
+        associatedReadAt = FindLegacyV86Bytes(
+            owner,
+            semanticEnd,
+            associatedRead,
+            sizeof(associatedRead));
 
-        associatedReadVerified =
-            owner + 0x72 <= ownerEnd
-            && memcmp(
-                owner + 0x70,
-                associatedRead,
-                sizeof(associatedRead)) == 0;
+        argumentCaptureVerified = argumentCaptureAt != nullptr;
+        descriptorGateVerified = descriptorGateAt != nullptr;
+        associatedReadVerified = associatedReadAt != nullptr;
+
+        if (argumentCaptureVerified
+            && descriptorGateVerified
+            && associatedReadVerified
+            && !(argumentCaptureAt < descriptorGateAt
+                && descriptorGateAt < associatedReadAt))
+        {
+            argumentCaptureVerified = false;
+            descriptorGateVerified = false;
+            associatedReadVerified = false;
+        }
 
         if (callsite[0] == 0xE8)
         {
@@ -38640,7 +39400,7 @@ static bool VerifyLegacyV98OlderConstructionOwnerAbi()
         && addTrueVerified;
 
     Logf(
-        "[UniversalLegacyV104] ownerAbi owner=%p size=0x%llX callsite=%p offset=0x%llX mutator=%p checks{argumentCapture=%s descriptorGate=%s associatedRead=%s rel32Target=%s pairPointers=%s addTrue=%s} faulted=%s verified=%s.",
+        "[UniversalLegacyV112] ownerAbi owner=%p size=0x%llX callsite=%p offset=0x%llX mutator=%p patterns{argumentCapture=0x%llX descriptorGate=0x%llX associatedRead=0x%llX} checks{rel32Target=%s pairPointers=%s addTrue=%s} faulted=%s verified=%s.",
         owner,
         static_cast<unsigned long long>(
             ownerEnd - owner),
@@ -38648,9 +39408,15 @@ static bool VerifyLegacyV98OlderConstructionOwnerAbi()
         static_cast<unsigned long long>(
             callsite - owner),
         mutator,
-        argumentCaptureVerified ? "yes" : "no",
-        descriptorGateVerified ? "yes" : "no",
-        associatedReadVerified ? "yes" : "no",
+        argumentCaptureAt
+            ? static_cast<unsigned long long>(argumentCaptureAt - owner)
+            : 0ULL,
+        descriptorGateAt
+            ? static_cast<unsigned long long>(descriptorGateAt - owner)
+            : 0ULL,
+        associatedReadAt
+            ? static_cast<unsigned long long>(associatedReadAt - owner)
+            : 0ULL,
         callVerified ? "yes" : "no",
         callShapeVerified ? "yes" : "no",
         addTrueVerified ? "yes" : "no",
@@ -38662,8 +39428,13 @@ static bool VerifyLegacyV98OlderConstructionOwnerAbi()
 
 static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
 {
-    if (!IsOlderLegacyLowridersBuild())
+    const int gameVersion = getGameVersion();
+    if (!IsLegacyExecutableImage()
+        || gameVersion < 12
+        || gameVersion >= 1000)
+    {
         return false;
+    }
 
     BennysMapState state =
         CaptureBennysMapState();
@@ -38700,14 +39471,14 @@ static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
         || !IsLegacyV98OlderMutationLayoutSafe())
     {
         Logf(
-            "[UniversalLegacyV104] Runtime resolver did not satisfy the exact frozen Legacy layout/fingerprint gate. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
+            "[UniversalLegacyV112] Runtime locator did not satisfy the exact supported Legacy layout/fingerprint gate. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
         return false;
     }
 
     if (!VerifyLegacyV98OlderConstructionOwnerAbi())
     {
         Logf(
-            "[UniversalLegacyV104] Runtime construction owner failed the frozen ABI/call-shape proof. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
+            "[UniversalLegacyV112] Located construction owner failed the semantic ABI/call-shape proof. No memory write or Rockstar construction call was attempted; falling back to the targeted IPL compatibility path.");
         return false;
     }
 
@@ -38753,7 +39524,7 @@ static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
     LegacyV67DerivedSetup2Snapshot before =
         CaptureLegacyV67DerivedSetup2Snapshot(
             g_legacyV98.lowriderChild,
-            "v104 older-Legacy pre-construction exact stock derived baseline");
+            "v112 cross-build Legacy pre-construction exact stock derived baseline");
 
     const bool stockDerived =
         before.valid
@@ -38821,7 +39592,7 @@ static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
     LegacyV67DerivedSetup2Snapshot after =
         CaptureLegacyV67DerivedSetup2Snapshot(
             g_legacyV98.lowriderChild,
-            "v104 older-Legacy post-construction before descriptor restore");
+            "v112 cross-build Legacy post-construction before descriptor restore");
 
     const uint16_t storyBennyAfter =
         CountLegacyV73DerivedPair(
@@ -38881,13 +39652,13 @@ static bool TryLoadBennysMapOlderLegacyUniversal(bool manualRetry)
     {
         ActivateBennysInterior(state);
         LogBennysMapState(
-            "[UniversalLegacyV104] SUCCESS: runtime-resolved Legacy construction loaded Benny's.",
+            "[UniversalLegacyV112] SUCCESS: runtime-located Legacy construction loaded Benny's.",
             state);
         return true;
     }
 
     LogBennysMapState(
-        "[UniversalLegacyV104] Construction committed exactly once; retaining the verified GROUP_MAP_SP overlay classification while passive streaming completes.",
+        "[UniversalLegacyV112] Construction committed exactly once; retaining the verified GROUP_MAP_SP overlay classification while passive streaming completes.",
         state);
     return false;
 }
@@ -38930,6 +39701,19 @@ static bool TryLoadBennysMap(bool manualRetry)
         ActivateBennysInterior(state);
         LogBennysMapState("[OK] Benny's map was already available.", state);
         return true;
+    }
+
+    if (IsLegacyExecutableImage()
+        && kExperimentalCrossEditionDeferredConstruction
+        && !g_experimentalLegacyDeferredConstructionAttempted
+        && !g_experimentalLegacyDeferredConstructionExecuting
+        && !manualRetry)
+    {
+        g_legacyV87RetrySafe = false;
+        Logf(
+            "[LegacyDeferredConstruction] Initial Legacy construction is intentionally deferred until gameplay has remained active for %lu ms. No Legacy construction mutation/call is performed during this startup pass.",
+            static_cast<unsigned long>(g_lateGameMapRefreshDelayMs));
+        return false;
     }
 
     if (IsEnhancedVersion())
@@ -39071,7 +39855,7 @@ static bool TryLoadBennysMap(bool manualRetry)
         return false;
     }
 
-    if (olderLegacyFallback)
+    if (IsLegacyExecutableImage())
     {
         if (TryLoadBennysMapOlderLegacyUniversal(manualRetry))
             return true;
@@ -39079,7 +39863,26 @@ static bool TryLoadBennysMap(bool manualRetry)
         if (g_legacyV98OlderMutationCommitted)
             return false;
 
-        return TryLoadBennysMapOlderLegacyIplFallback(manualRetry);
+        if (olderLegacyFallback)
+            return TryLoadBennysMapOlderLegacyIplFallback(manualRetry);
+
+        if (g_legacyV98OlderMutationAttempted)
+        {
+            Logf(
+                "[CrossBuildLocator] Legacy dynamic construction was attempted and did not commit; refusing a second construction path in the same session.");
+            return false;
+        }
+
+        if (getGameVersion() != 102)
+        {
+            Logf(
+                "[CrossBuildLocator] Legacy universal locator did not reach a safe mutation-ready state on gameVersion=%d. No frozen-address fallback exists for this unknown Legacy build; failing closed.",
+                getGameVersion());
+            return false;
+        }
+
+        Logf(
+            "[CrossBuildLocator] Legacy universal locator safely refused before mutation on known build 102; retaining the frozen v92/v77 path as a compatibility fallback for this build only.");
     }
 
     if (!manualRetry)
@@ -39294,6 +40097,9 @@ static bool IsProductionStartupSuccess(
     if (!enhanced)
         return true;
 
+    if (kExperimentalEnhancedLateRefreshIsolation)
+        return true;
+
     return IsEnhancedV100FrozenProductionHealthy();
 }
 
@@ -39301,16 +40107,28 @@ static bool IsProductionStartupPending(
     bool enhanced,
     bool loaded)
 {
-    if (enhanced
-        || loaded)
+    if (enhanced)
     {
+        return kExperimentalEnhancedLateRefreshIsolation
+            && g_lateGameMapRefreshEnabled
+            && !loaded
+            && !g_lateGameMapRefreshSettledLogged;
+    }
+
+    if (loaded)
         return false;
+
+    if (kExperimentalCrossEditionDeferredConstruction
+        && g_lateGameMapRefreshEnabled
+        && !g_experimentalLegacyDeferredConstructionAttempted
+        && !g_lateGameMapRefreshSettledLogged)
+    {
+        return true;
     }
 
     return g_legacyV87RetrySafe
         || IsLegacyV87ConstructionCommitted()
-        || (IsOlderLegacyLowridersBuild()
-            && g_legacyV98OlderMutationCommitted);
+        || g_legacyV98OlderMutationCommitted;
 }
 
 static void EmitProductionFailureDiagnostics(
@@ -39439,6 +40257,39 @@ void ScriptMain()
     g_experimentalMapStateReprocess = false;
     g_experimentalOverlayDescriptorRewrite = false;
 
+    g_lateGameMapRefreshEnabled =
+        ReadIniBool(
+            g_iniPath,
+            "Settings",
+            "LateGameMapRefresh",
+            true);
+
+    {
+        int delayMs = ReadIniInt(
+            g_iniPath,
+            "Settings",
+            "LateGameMapRefreshDelayMs",
+            2500);
+        if (delayMs < 0)
+            delayMs = 0;
+        if (delayMs > 15000)
+            delayMs = 15000;
+        g_lateGameMapRefreshDelayMs =
+            static_cast<DWORD>(delayMs);
+
+        int settleMs = ReadIniInt(
+            g_iniPath,
+            "Settings",
+            "LateGameMapRefreshSettleMs",
+            5000);
+        if (settleMs < 500)
+            settleMs = 500;
+        if (settleMs > 15000)
+            settleMs = 15000;
+        g_lateGameMapRefreshSettleMs =
+            static_cast<DWORD>(settleMs);
+    }
+
     if (g_logEnabled)
         ResetLogFile();
 
@@ -39460,6 +40311,15 @@ void ScriptMain()
     }
 
     Logf("BennysMapLoader starting...");
+    Logf("[ExperimentalLog] Verbose success logging is enabled for this test build; startup diagnostics and post-success LateMapRefresh lines will be retained.");
+    if (enhanced && kExperimentalEnhancedLateRefreshIsolation)
+    {
+        Logf("[LateMapIsolation] ACTIVE: Enhanced V100 descriptor injection is suppressed during natural startup. v111 replays the verified Rockstar C26F00 construction pass once after stable gameplay; the redundant Enhanced IPL fallback is disabled.");
+    }
+    else if (!enhanced && kExperimentalCrossEditionDeferredConstruction)
+    {
+        Logf("[LegacyDeferredConstruction] ACTIVE: Legacy construction is deferred until stable gameplay. Older Legacy will then run the existing v104 universal path; build 102 will run the existing v92/v77 path. Edition-specific safety gates remain unchanged.");
+    }
     Logf("[Info] Internal name: BennysMapLoader");
     LogLoadedModuleIdentity();
     LogEarlyConstructionSnapshot();
@@ -39479,15 +40339,27 @@ void ScriptMain()
     Logf("[Info] Detected edition: %s", GetEditionTag(enhanced));
     Logf("[Info] getGameVersion()=%d", gameVersion);
     Logf("[Info] Logging=%s diagnostics=%s deepMemoryDiagnostics=%s garageDoorRecovery=%s experimentalMemoryPatch=%s experimentalInternalGroupAdd=%s experimentalMapStateReprocess=%s experimentalOverlayDescriptorRewrite=%s", g_logEnabled ? "on" : "off", g_diagnosticsEnabled ? "on" : "off", g_deepMemoryDiagnostics ? "on" : "off", g_bennysGarageDoorRecoveryEnabled ? "on" : "off", g_experimentalMemoryPatch ? "on" : "off", g_experimentalInternalGroupAdd ? "on" : "off", g_experimentalMapStateReprocess ? "on" : "off", g_experimentalOverlayDescriptorRewrite ? "on" : "off");
+    Logf(
+        "[Info] DeferredConstruction=%s delayMs=%lu settleMs=%lu. Enhanced uses one verified deferred Rockstar construction replay; Legacy reuses its verified edition-specific construction path after gameplay is stable.",
+        g_lateGameMapRefreshEnabled ? "on" : "off",
+        static_cast<unsigned long>(g_lateGameMapRefreshDelayMs),
+        static_cast<unsigned long>(g_lateGameMapRefreshSettleMs));
     Logf("[Info] Cross-build garage-door recovery is %s. It preloads the stock shutter model, keeps the original 15 m exterior approach trigger, closes after the player crosses into the workshop, and reopens only for an allowed current vehicle; it is not tied to a GTA build number.", g_bennysGarageDoorRecoveryEnabled ? "enabled" : "disabled");
     Logf("[Info] Garage-door vehicle policy mirrors BennysMotorworksRevamped.ini: AllowEmergencyVehicles=%s AllowServiceVehicles=%s AllowUtilityVehicles=%s AllowOversizedVehicles=%s; boats/cycles/helicopters/planes are always rejected and on-foot opening is disabled.", g_bennysAllowEmergencyVehicles ? "true" : "false", g_bennysAllowServiceVehicles ? "true" : "false", g_bennysAllowUtilityVehicles ? "true" : "false", g_bennysAllowOversizedVehicles ? "true" : "false");
     if (enhanced)
     {
-        Logf("[Info] v100b tightened production integration is active. Enhanced Benny patching is limited to the verified C26F00 construction path; Legacy build-102 mutation behavior is unchanged; v99d/v98e read-only resolvers are retained for automatic failure diagnostics only.");
+        if (kExperimentalEnhancedLateRefreshIsolation)
+        {
+            Logf("[Info] v113 Enhanced deferred-replay mode: the construction target is located by a tiered RVA-independent signature/call-graph locator. Tier-1 uses the proven Lowriders instruction profile; Tier-2 uses a tightened semantic fallback. A unique verified match is hooked once, natural startup Benny injection remains suppressed, and the located Rockstar construction pass is replayed after stable gameplay. Standalone IPL fallback remains disabled on Enhanced.");
+        }
+        else
+        {
+            Logf("[Info] v112 cross-build locator is active. Enhanced construction is selected by semantic pattern + call graph and patched only on one verified safe match; Legacy retains its v98/v92 edition-specific structural resolver paths.");
+        }
     }
     else
     {
-        Logf("[Info] Legacy v104 enables the v98e universal resolver as a strictly gated one-shot construction path for older Legacy builds when the runtime layout, overlay row, descriptor vectors, derived vector, and construction ABI all match the proven Legacy fingerprint. Frozen build-102 v92/v77 and Enhanced behavior remain unchanged.");
+        Logf("[Info] v112 Legacy deferred-construction mode tries the v98 universal locator on every Legacy build: wrapper, group loop, runtime context, Lowriders child, descriptor/derived layouts, overlay row, construction owner, callsite, and add mutator are discovered before mutation. The frozen build-102 v92/v77 route is retained only as a known-build fallback if v98 refuses before writing anything.");
         LogLegacyNaturalDescriptorState("startup");
         LogLegacyV59PostConstructionState("startup");
     }
@@ -39497,11 +40369,15 @@ void ScriptMain()
     Logf("[Info] Target changeset: %s -> 0x%08X", kBennysChangeSet, Joaat(kBennysChangeSet));
     if (!enhanced && IsOlderLegacyLowridersBuild())
     {
-        Logf("[Info] Older Legacy compatibility is active: Benny's seven known Lowriders IPLs may be requested once as a targeted fallback. Whole GROUP_MAP, ON_ENTER_MP, and ON_ENTER_SP remain disabled.");
+        Logf("[Info] Older Legacy compatibility is deferred with the v104 universal construction path. Its existing seven-IPL fallback remains available only if the exact runtime construction gate refuses; no second late IPL request is added. Whole GROUP_MAP, ON_ENTER_MP, and ON_ENTER_SP remain disabled.");
+    }
+    else if (enhanced)
+    {
+        Logf("[Info] Enhanced v111 does not call REQUEST_IPL, ON_ENTER_MP, ON_ENTER_SP, or EXECUTE_CONTENT_CHANGESET_GROUP_FOR_ALL(GROUP_MAP). The verified deferred C26F00 replay is the only activation attempt.");
     }
     else
     {
-        Logf("[Info] This build intentionally does not call REQUEST_IPL, ON_ENTER_MP, ON_ENTER_SP, or EXECUTE_CONTENT_CHANGESET_GROUP_FOR_ALL(GROUP_MAP).");
+        Logf("[Info] Legacy build 102 defers its existing v92/v77 construction path until stable gameplay. No new REQUEST_IPL, whole GROUP_MAP, ON_ENTER_MP, or ON_ENTER_SP fallback is introduced.");
     }
     DumpBuild1012OwnerGateState();
     if (enhanced)
@@ -39672,14 +40548,21 @@ void ScriptMain()
         if (productionSuccess)
             Notify("~b~~h~[ Benny's Map Loader ]~h~~w~  ~w~~h~Loaded~w~");
         else if (!enhanced
+            && kExperimentalCrossEditionDeferredConstruction
+            && !g_experimentalLegacyDeferredConstructionAttempted)
+            Notify("~y~~h~[ Benny's Map Loader ]~h~~w~  Deferred Legacy construction pending");
+        else if (!enhanced
             && (IsLegacyV87ConstructionCommitted()
-                || (IsOlderLegacyLowridersBuild()
-                    && g_legacyV98OlderMutationCommitted)))
+                || g_legacyV98OlderMutationCommitted))
             Notify("~b~~h~[ Benny's Map Loader ]~h~~w~  Legacy content constructed - waiting for streaming");
         else if (!enhanced && g_legacyV87RetrySafe)
             Notify("~y~~h~[ Benny's Map Loader ]~h~~w~  Legacy startup not ready - retrying automatically");
         else if (!enhanced)
             Notify("~r~~h~[ Benny's Map Loader ]~h~~w~  Legacy stable load failed - check log");
+        else if (kExperimentalEnhancedLateRefreshIsolation
+            && g_lateGameMapRefreshEnabled
+            && !g_lateGameMapRefreshSettledLogged)
+            Notify("~y~~h~[ Benny's Map Loader ]~h~~w~  Deferred Enhanced construction pending");
         else
             Notify("~r~~h~[ Benny's Map Loader ]~h~~w~  Load failed - check BennysMapLoader.log");
     }
@@ -39694,8 +40577,21 @@ void ScriptMain()
     {
         WAIT(0);
 
-        MaintainBennysGarageDoorRecovery(
-            GetTickCount64());
+        const ULONGLONG now = GetTickCount64();
+
+        MaintainBennysGarageDoorRecovery(now);
+
+        UpdateLateGameBennysMapRefresh(
+            loaded,
+            now);
+
+        if (!enhanced
+            && !loaded
+            && g_legacyV87RetrySafe
+            && nextLegacyStableRetry == 0ULL)
+        {
+            nextLegacyStableRetry = now + 1000ULL;
+        }
 
         if (!enhanced
             && !loaded
@@ -39739,9 +40635,36 @@ void ScriptMain()
 
             if (passiveReady)
             {
+                if (enhanced
+                    && g_experimentalEnhancedDeferredReplayAttempted
+                    && !g_experimentalEnhancedDeferredReplayStrictSuccess)
+                {
+                    LogBennysMapState(
+                        "[LateMapDeferredReplay] Passive probe sees Benny's, but v111 refuses adoption because replay safety validation failed.",
+                        state);
+                    continue;
+                }
+
                 loaded = true;
                 ActivateBennysInterior(state);
-                LogBennysMapState("[OK] Benny's map appeared after startup and was adopted.", state);
+
+                if (g_lateGameMapRefreshAttempted)
+                {
+                    g_lateGameMapRefreshSettledLogged = true;
+                    const char* passiveSuccessLabel =
+                        IsLegacyExecutableImage()
+                            ? "[LegacyDeferredConstruction] SUCCESS: Benny's became available after deferred Legacy construction and was adopted by the passive probe."
+                            : (g_lateGameMapRefreshIplsRequested
+                                ? "[LateMapRefresh] SUCCESS: Benny's became available after the deferred replay + one-shot IPL request and was adopted by the passive probe."
+                                : "[LateMapDeferredReplay] SUCCESS: Benny's became available after the deferred Rockstar construction replay and was adopted by the passive probe; no IPL request was required.");
+                    LogBennysMapState(passiveSuccessLabel, state);
+                }
+                else
+                {
+                    LogBennysMapState(
+                        "[OK] Benny's map appeared after startup and was adopted.",
+                        state);
+                }
 
                 ResolveProductionStartupLog(
                     enhanced,
